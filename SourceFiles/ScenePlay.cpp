@@ -53,8 +53,8 @@ void ScenePlay::loadLevel(const std::string& path)
 
     if (!fin.is_open())
     {
-        std::cerr << "Error: Could not read or open file!\n";
-        return;
+        std::cerr << "Error: Could not read or open file at path: " << path << std::endl;
+        exit(1);
     }
 
     std::string dataIn;
