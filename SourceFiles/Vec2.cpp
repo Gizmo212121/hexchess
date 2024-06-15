@@ -75,8 +75,8 @@ void Vec2::operator /= (const float val)
     }
     else
     {
-        m_x *= val;
-        m_y *= val;
+        m_x /= val;
+        m_y /= val;
     }
 }
 

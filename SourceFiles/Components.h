@@ -14,79 +14,47 @@ class CTransform : public Component
 {
 public:
     Vec2 pos = { 0.0, 0.0 };
-    Vec2 prevPos = pos;
-    Vec2 velocity = { 0.0, 0.0 };
     Vec2 scale = { 1.0, 1.0 };
     float angle = 0;
 
     CTransform() {}
     CTransform(const Vec2& p)
         : pos(p) {}
-    CTransform(const Vec2& p, const Vec2& sp, const Vec2& sc, float a)
-        : pos(p), prevPos(p), velocity(sp), scale(sc), angle(a) {}
+    CTransform(const Vec2& p, const Vec2& sc, float a)
+        : pos(p), scale(sc), angle(a) {}
 };
 
-class CLifespan : public Component
+class CAxialPos : public Component
 {
 public:
-    int lifespan = 0;
-    int frameCreated = 0;
+    Vec2 pos = { 0.0, 0.0 };
+    Vec2 prevPos = pos;
 
-    CLifespan()
-        : lifespan(0), frameCreated(0) {}
-    CLifespan(const int lifespan, const int frame)
-        : lifespan(lifespan), frameCreated(frame) {}
+    CAxialPos() {}
+    CAxialPos(const Vec2& p)
+        : pos(p), prevPos(p) {}
 };
 
-class CDamage : public Component
+class CPiece : public Component
 {
 public:
-    int damage = 0;
-    int frameCreated = 0;
-    int framesToDamage = 0;
+    bool color = 0;
 
-    CDamage()
-        : damage(0), frameCreated(0), framesToDamage(0) {}
+    // Types:
+    //  None = 0
+    //  King = 1
+    //  Pawn = 2
+    //  Knight = 3
+    //  Bishop = 4
+    //  Rook = 5
+    //  Queen = 6
+    int type = 0;
 
-    CDamage(const int d, const int fc, const int fd)
-        : damage(d), frameCreated(fc), framesToDamage(fd) {}
-};
+    std::vector<Vec2> moveSet;
 
-class CHealth : public Component
-{
-public:
-    int health = 1;
-    
-    CHealth()
-        : health(1) {}
-    CHealth(const int h)
-        : health(h) {}
-};
-
-class CInput : public Component
-{
-public:
-    bool up = false;
-    bool down = false;
-    bool left = false;
-    bool right = false;
-    bool swingSword = false;
-    bool canSwingSword = true;
-    bool canJump = true;
-    bool canSlide = true;
-
-    CInput() {}
-};
-
-class CBoundingBox : public Component
-{
-public:
-    Vec2 size;
-    Vec2 halfSize;
-
-    CBoundingBox() {}
-    CBoundingBox(const Vec2& s)
-        : size(s), halfSize(s / 2) { has = true ; }
+    CPiece() {}
+    CPiece(const bool color, const int type)
+        : color(color), type(type) {}
 };
 
 class CAnimation : public Component
@@ -109,27 +77,12 @@ public:
     }
 };
 
-class CGravity : public Component
-{
-public:
-    float gravity = 0;
-
-    CGravity() {}
-    CGravity(const float gravity)
-        : gravity(gravity) {}
-};
-
 class CState : public Component
 {
 public:
-    std::string state = "Idle";
-    bool flipped = false;
-    bool midAir = false;
-    size_t jumpTimer = 0;
-    size_t slideTimer = 0;
-    size_t swingSwordTimer = 0;
+    bool isLifted = false;
     
     CState() {}
-    CState(const std::string& state)
-        : state(state) {}
+    CState(const bool lift)
+        : isLifted(lift) {}
 };

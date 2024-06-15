@@ -30,7 +30,7 @@ void SceneMenu::sDoAction(const Action& action)
     if (action.type() == "START")
     {
         if (action.name() == "QUIT") { onEnd() ; }
-        else if (action.name() == "START_LEVEL") { m_game->changeScene("PLAY", std::make_shared<ScenePlay>(m_game, "ResourceFiles/level1.txt")) ; }
+        else if (action.name() == "START_LEVEL") { m_game->changeScene("PLAY", std::make_shared<ScenePlay>(m_game)) ; }
     }
     else if (action.type() == "END")
     {
