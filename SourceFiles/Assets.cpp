@@ -19,10 +19,6 @@ void Assets::addTexture(std::string& name, std::string& path)
     m_textures[name] = std::make_shared<sf::Texture>(texture);
 }
 
-void Assets::addAnimation(std::string& name, Animation animation)
-{
-    m_animations[name] = std::make_shared<Animation>(animation);
-}
 
 void Assets::addSound(std::string& name, std::string& path)
 {
@@ -76,27 +72,6 @@ void Assets::loadFromFile(const std::string& path)
 
             addTexture(name, path);
         }
-        else if (assetType == "Animation")
-        {
-            std::string animationName, textureName;
-
-            float startingX, startingY, endingX, endingY, frameSizeX, frameSizeY;
-
-            size_t speed;
-
-            bool repeat;
-
-            fin >> animationName >> textureName >> startingX >> startingY
-                >> endingX >> endingY >> frameSizeX >> frameSizeY >> speed >> repeat;
-
-            std::cout << "Loading animation of texture: " << textureName << std::endl;
-
-            std::shared_ptr<sf::Texture> texture = getTexture(textureName);
-            
-            Animation animation(animationName, texture, Vec2(startingX, startingY), Vec2(endingX, endingY), Vec2(frameSizeX, frameSizeY), speed, repeat);
-
-            addAnimation(animationName, animation);
-        }
         else if (assetType == "Sound")
         {
             std::cout << "Sound asset not implemented\n";
@@ -120,17 +95,6 @@ const std::shared_ptr<sf::Texture> Assets::getTexture(const std::string& name) c
     if (it == m_textures.end())
     {
         std::cerr << "Error: Texture " << name << " not found!" << std::endl;
-        exit(1);
-    }
-    return it->second;
-}
-
-const std::shared_ptr<Animation> Assets::getAnimation(const std::string& name) const
-{
-    auto it = m_animations.find(name);
-    if (it == m_animations.end())
-    {
-        std::cerr << "Error in Assets.cpp: Animation " << name << " not found!" << std::endl;
         exit(1);
     }
     return it->second;

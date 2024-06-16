@@ -9,9 +9,8 @@ class EntityManager;
 typedef std::tuple<
     CTransform,
     CPiece,
-    CAxialPos,
     CState,
-    CAnimation
+    CSprite
 > ComponentTuple;
 
 class Entity

@@ -6,9 +6,8 @@
 #include "Action.h"
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Window/Joystick.hpp>
-#include <fstream>
 #include <memory>
-#include <unordered_map>
+#include <cmath>
 
 
 ScenePlay::ScenePlay(GameEngine* gameEngine)
@@ -29,6 +28,12 @@ void ScenePlay::init()
     m_gridText.setFont(m_game->assets().getFont("Arial"));
 
     m_entityManager = EntityManager();
+
+
+    initializeAxialCoordinateGrid();
+    initializeTiles();
+    initializePieces();
+
 }
 
 
@@ -95,9 +100,9 @@ void ScenePlay::sRender()
 
     for (const std::shared_ptr<Entity>& entity : m_entityManager.getEntities("Background"))
     {
-        if (entity->hasComponent<CAnimation>())
+        if (entity->hasComponent<CSprite>())
         {
-            sf::Sprite& backgroundSprite = entity->getComponent<CAnimation>().animations.at(entity->getComponent<CAnimation>().currentAnimation).getSprite();
+            sf::Sprite& backgroundSprite = entity->getComponent<CSprite>().sprite;
 
             float scaleX = static_cast<float>(m_game->window().getSize().x) / backgroundSprite.getTexture()->getSize().x;
             float scaleY = static_cast<float>(m_game->window().getSize().y) / backgroundSprite.getTexture()->getSize().y;
@@ -120,63 +125,83 @@ void ScenePlay::sRender()
                 continue;
             }
 
-            if (entity->hasComponent<CAnimation>())
+            if (entity->hasComponent<CSprite>() && entity->hasComponent<CTransform>())
             {
                 CTransform& transform = entity->getComponent<CTransform>();
-                std::string currentAnimation = entity->getComponent<CAnimation>().currentAnimation;
 
-                auto animationIterator = entity->getComponent<CAnimation>().animations.find(currentAnimation);
+                sf::Sprite& sprite = entity->getComponent<CSprite>().sprite;
 
-                if (animationIterator != entity->getComponent<CAnimation>().animations.end())
-                {
-                    Animation& animation = animationIterator->second;
-                    sf::Sprite& sprite = animation.getSprite();
+                sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
+                sprite.setRotation(transform.angle);
+                sprite.setPosition(transform.pos.getX(), transform.pos.getY());
+                sprite.setScale(transform.scale.getX() + 0.001, transform.scale.getY() + 0.001);
 
-                    sprite.setRotation(transform.angle);
-                    sprite.setPosition(transform.pos.getX(), transform.pos.getY());
-                    sprite.setScale(transform.scale.getX(), transform.scale.getY());
-
-                    m_game->window().draw(sprite);
-                }
-                else
-                {
-                    std::cerr << "Warning: Animation '" << currentAnimation << "'not found for entity: " << entity->tag();
-                }
+                m_game->window().draw(sprite);
             }
         }
     }
-
-
-    // EHHHHH IDK YET ABOUT THIS 
-    /*
-    if (m_drawGrid)
-    {
-        float leftX = m_game->window().getView().getCenter().x - static_cast<float>(width()) / 2;
-        float rightX = leftX + width() + m_gridSize.getX();
-        float nextGridX = leftX - ((int)leftX % (int)m_gridSize.getX());
-
-        for (float x = nextGridX; x < rightX; x += m_gridSize.getX())
-        {
-            drawLine(Vec2(x, 0), Vec2(x, height()));
-        }
-
-        for (float y = 0; y < height(); y += m_gridSize.getY())
-        {
-            drawLine(Vec2(leftX, height() - y), Vec2(rightX, height() - y));
-
-            for (float x = nextGridX; x < rightX; x += m_gridSize.getX())
-            {
-                std::string xCell = std::to_string((int)x / (int)m_gridSize.getX());
-                std::string yCell = std::to_string((int)y / (int)m_gridSize.getY());
-
-                m_gridText.setString("(" + xCell + "," + yCell + ")");
-                m_gridText.setPosition(x + 3, height() - y - m_gridSize.getY() + 2);
-
-                m_game->window().draw(m_gridText);
-            }
-        }
-    }
-    */
 
     m_game->window().display();
+}
+
+
+void ScenePlay::initializeAxialCoordinateGrid()
+{
+    for (int q = -5; q <= 5; q++)
+    {
+        int r1 = std::max(-5, -q - 5);
+        int r2 = std::min(5, -q + 5);
+        for (int r = r1; r <= r2; r++)
+        {
+            m_grid[Vec2(q, r)] = nullptr;
+        }
+    }
+}
+
+void ScenePlay::initializePieces()
+{
+    Vec2 axialPos(0, 0);
+    std::shared_ptr<Entity> pawn = m_entityManager.addEntity("Pawn");
+    pawn->addComponent<CPiece>(0, 2);
+    pawn->addComponent<CSprite>(*m_game->assets().getTexture("wPawn"));
+    pawn->addComponent<CState>();
+    CTransform& pawnTransform = pawn->addComponent<CTransform>();
+    pawnTransform.pos = axialToPixel(axialPos);
+    pawnTransform.scale /= 5;
+
+    m_grid[axialPos] = pawn;
+}
+
+Vec2 ScenePlay::axialToPixel(const Vec2& vec)
+{
+    float x = m_size * (3.0 / 2 * vec.getX());
+    float y = m_size * (sqrt(3) / 2 * vec.getX() + sqrt(3) * vec.getY());
+
+    float viewportXHalf = m_game->window().getSize().x / 2.0;
+    float viewportYHalf = m_game->window().getSize().y / 2.0;
+
+    return Vec2(viewportXHalf + x, viewportYHalf - y);
+}
+
+void ScenePlay::initializeTiles()
+{
+    for (auto it : m_grid)
+    {
+        std::shared_ptr<Entity> hex = m_entityManager.addEntity("Tile");
+
+        std::string hexAssetName;
+
+        int code = (int)it.first.getX() - (int)it.first.getY();
+
+        if (code % 3 == 0) {  hexAssetName = "Hex1"; }
+        else if (code % 3 == -1) { hexAssetName = "Hex2"; }
+        else if (code % 3 == 2) { hexAssetName = "Hex2"; }
+        else { hexAssetName = "Hex0"; }
+
+        hex->addComponent<CSprite>(*m_game->assets().getTexture(hexAssetName));
+        CTransform& transform = hex->addComponent<CTransform>();
+        transform.pos = axialToPixel(it.first);
+        transform.scale /= 3;
+
+    }
 }

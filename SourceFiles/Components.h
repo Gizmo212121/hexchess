@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Animation.h"
 #include "Assets.h"
 #include <unordered_map>
 
@@ -22,17 +21,6 @@ public:
         : pos(p) {}
     CTransform(const Vec2& p, const Vec2& sc, float a)
         : pos(p), scale(sc), angle(a) {}
-};
-
-class CAxialPos : public Component
-{
-public:
-    Vec2 pos = { 0.0, 0.0 };
-    Vec2 prevPos = pos;
-
-    CAxialPos() {}
-    CAxialPos(const Vec2& p)
-        : pos(p), prevPos(p) {}
 };
 
 class CPiece : public Component
@@ -57,23 +45,16 @@ public:
         : color(color), type(type) {}
 };
 
-class CAnimation : public Component
+class CSprite : public Component
 {
 public:
-    std::unordered_map<std::string, Animation> animations;
-    std::string currentAnimation;
+    sf::Sprite sprite;
 
-    CAnimation() {}
+    CSprite() {}
 
-    CAnimation(const std::unordered_map<std::string, Animation>& anims, const std::string& currentAnim)
-        : animations(anims), currentAnimation(currentAnim)
+    CSprite(const sf::Texture& texture)
     {
-    }
-
-    CAnimation(std::string animationName, const std::shared_ptr<Animation>& animation)
-    {
-        animations[animationName] = *animation;
-        currentAnimation = animationName;
+        sprite.setTexture(texture);
     }
 };
 
