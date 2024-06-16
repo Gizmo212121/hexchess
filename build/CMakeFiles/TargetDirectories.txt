@@ -1,3 +1,0 @@
-/home/neogizmo/Projects/GameProgramming/hexchess/build/CMakeFiles/HexChess.dir
-/home/neogizmo/Projects/GameProgramming/hexchess/build/CMakeFiles/edit_cache.dir
-/home/neogizmo/Projects/GameProgramming/hexchess/build/CMakeFiles/rebuild_cache.dir
