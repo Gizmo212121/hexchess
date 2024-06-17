@@ -6,6 +6,8 @@ void Assets::addTexture(std::string& name, std::string& path)
 {
     sf::Texture texture;
 
+    texture.setSmooth(true);
+
     if (!texture.loadFromFile(path))
     {
         std::cout << "Texture at path " << path << " failed to load!\n";

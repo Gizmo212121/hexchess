@@ -4,8 +4,6 @@
 #include "GameEngine.h"
 #include "Components.h"
 #include "Action.h"
-#include <SFML/Graphics/RectangleShape.hpp>
-#include <SFML/Window/Joystick.hpp>
 #include <memory>
 #include <cmath>
 
@@ -127,19 +125,52 @@ void ScenePlay::sRender()
 
             if (entity->hasComponent<CSprite>() && entity->hasComponent<CTransform>())
             {
-                CTransform& transform = entity->getComponent<CTransform>();
+                if (entity->tag() == "Tile")
+                {
+                    CTransform& transform = entity->getComponent<CTransform>();
 
-                sf::Sprite& sprite = entity->getComponent<CSprite>().sprite;
+                    sf::Sprite& sprite = entity->getComponent<CSprite>().sprite;
 
-                sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
-                sprite.setRotation(transform.angle);
-                sprite.setPosition(transform.pos.getX(), transform.pos.getY());
-                sprite.setScale(transform.scale.getX() + 0.001, transform.scale.getY() + 0.001);
+                    sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
+                    sprite.setRotation(transform.angle);
+                    sprite.setPosition(transform.pos.getX(), transform.pos.getY());
+                    sprite.setScale(transform.scale.getX() + 0.001, transform.scale.getY() + 0.001);
 
-                m_game->window().draw(sprite);
+                    m_game->window().draw(sprite);
+                }
+                else
+                {
+                    CTransform& transform = entity->getComponent<CTransform>();
+
+                    sf::Sprite& sprite = entity->getComponent<CSprite>().sprite;
+
+                    sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
+                    sprite.setRotation(transform.angle);
+                    sprite.setPosition(transform.pos.getX(), transform.pos.getY());
+                    sprite.setScale(transform.scale.getX(), transform.scale.getY());
+
+                    m_game->window().draw(sprite);
+
+                }
             }
         }
     }
+
+    if (m_drawGrid)
+    {
+        for (auto it : m_grid)
+        {
+            std::string axialCoordinateText = '(' + std::to_string(static_cast<int>(it.first.getX())) + ", " + std::to_string(static_cast<int>(it.first.getY())) + ')';
+            m_gridText.setString(axialCoordinateText);
+            sf::FloatRect localBounds = m_gridText.getLocalBounds();
+            m_gridText.setOrigin(localBounds.width / 2, localBounds.height / 2);
+
+            Vec2 axialCoordinate = axialToPixel(it.first);
+            m_gridText.setPosition(axialCoordinate.getX(), axialCoordinate.getY());
+            m_game->window().draw(m_gridText);
+        }
+    }
+
 
     m_game->window().display();
 }
@@ -160,16 +191,73 @@ void ScenePlay::initializeAxialCoordinateGrid()
 
 void ScenePlay::initializePieces()
 {
-    Vec2 axialPos(0, 0);
-    std::shared_ptr<Entity> pawn = m_entityManager.addEntity("Pawn");
-    pawn->addComponent<CPiece>(0, 2);
-    pawn->addComponent<CSprite>(*m_game->assets().getTexture("wPawn"));
-    pawn->addComponent<CState>();
-    CTransform& pawnTransform = pawn->addComponent<CTransform>();
-    pawnTransform.pos = axialToPixel(axialPos);
-    pawnTransform.scale /= 5;
+    std::vector<std::vector<Vec2>> pieces;
 
-    m_grid[axialPos] = pawn;
+    std::vector kingPosition = {Vec2(1, -5)};
+    pieces.push_back(kingPosition);
+
+    std::vector pawnPositions =
+    { 
+        Vec2(-4, -1), Vec2(-3, -1), Vec2(-2, -1),
+        Vec2(-1, -1), Vec2( 0, -1), Vec2( 1, -2),
+        Vec2( 2, -3), Vec2( 3, -4), Vec2( 4, -5),
+    };
+    pieces.push_back(pawnPositions);
+
+    std::vector knightPositions =
+    {
+        Vec2(-2, -3), Vec2(2, -5)
+    };
+    pieces.push_back(knightPositions);
+
+    std::vector bishopPositions =
+    {
+        Vec2(0, -3), Vec2(0, -4), Vec2(0, -5)
+    };
+    pieces.push_back(bishopPositions);
+
+    std::vector rookPositions =
+    {
+        Vec2(-3, -2), Vec2(3, -5)
+    };
+    pieces.push_back(rookPositions);
+
+    std::vector queenPositions = {Vec2(-1, -4)};
+    pieces.push_back(queenPositions);
+
+
+    std::string intToType[6] = { "King", "Pawn", "Knight", "Bishop", "Rook", "Queen" };
+    char color[2] = { 'b', 'w' };
+
+    for (size_t i = 0; i < pieces.size(); i++)
+    {
+        for (const Vec2& axialPos : pieces[i])
+        {
+            for (int colorIndex = 0; colorIndex < 2; colorIndex++)
+            {
+                std::shared_ptr<Entity> piece = m_entityManager.addEntity("Piece");
+
+                piece->addComponent<CSprite>(*m_game->assets().getTexture(color[colorIndex] + intToType[i]));
+                piece->addComponent<CPiece>(colorIndex, i + 1);
+                piece->addComponent<CState>();
+
+                CTransform& pieceTransform = piece->addComponent<CTransform>();
+                pieceTransform.scale /= 14;
+
+                if (!colorIndex)
+                {
+                    pieceTransform.pos = axialToPixel(axialPos);
+                    m_grid[axialPos] = piece;
+                }
+                else
+                {
+                    Vec2 blackAxialPos = axialPos * -1;
+                    pieceTransform.pos = axialToPixel(blackAxialPos);
+                    m_grid[blackAxialPos] = piece;
+                }
+            }
+        }
+    }
 }
 
 Vec2 ScenePlay::axialToPixel(const Vec2& vec)
