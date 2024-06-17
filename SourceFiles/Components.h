@@ -41,6 +41,7 @@ public:
     int type = 0;
 
     std::vector<Vec2> moveSet;
+    std::vector<Vec2> takeSet;
 
     CPiece() {}
     CPiece(const bool color, const int type)

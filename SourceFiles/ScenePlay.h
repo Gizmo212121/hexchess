@@ -43,7 +43,9 @@ protected:
     bool onBoard(const Vec2& vec);
     Vec2 getAxialFromGridPiece(const std::shared_ptr<Entity>& piece);
 
-    void movePiece(const Vec2& targetPosition, std::shared_ptr<Entity> piece);
+    void movePiece(const Vec2& targetPosition, const std::shared_ptr<Entity>& piece);
+    void calculateMoveSet(const Vec2& pos, std::shared_ptr<Entity> piece);
+    void calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece);
 
 
     void onEnd() override;

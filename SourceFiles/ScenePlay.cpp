@@ -147,7 +147,7 @@ void ScenePlay::onEnd()
 void ScenePlay::update()
 {
     m_entityManager.update();
-    //std::cout << m_entityManager.totalEntities() << std::endl;
+    std::cout << m_entityManager.totalEntities() << std::endl;
 
     if (m_paused)
     {
@@ -215,9 +215,14 @@ void ScenePlay::sMouseInput()
             std::cout << axialPos << std::endl;
             std::cout << mousePos << std::endl;
 
-            if (onBoard(axialPos))
+            if (onBoard(axialPos) && m_grid[axialPos])
             {
-                player.selectedPiece = m_grid[axialPos];
+                const CPiece& cPiece = m_grid[axialPos]->getComponent<CPiece>();
+                if (cPiece.color == whiteToMove)
+                {
+                    player.selectedPiece = m_grid[axialPos];
+                    calculateMoveSet(axialPos, player.selectedPiece);
+                }
             }
         }
         else
@@ -266,43 +271,84 @@ void ScenePlay::sRender()
 
     if (m_drawTextures)
     {
-        for (const std::shared_ptr<Entity>& entity : m_entityManager.getEntities())
+        //for (const std::shared_ptr<Entity>& entity : m_entityManager.getEntities("Background"))
+        const CPlayer& cPlayer = m_player->getComponent<CPlayer>();
+
+        for (const std::shared_ptr<Entity>& entity : m_entityManager.getEntities("Tile"))
         {
-            if (entity->tag() == "Background")
+            CTransform& transform = entity->getComponent<CTransform>();
+
+            sf::Sprite& sprite = entity->getComponent<CSprite>().sprite;
+
+            sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
+            sprite.setRotation(transform.angle);
+            sprite.setPosition(transform.pos.getX(), transform.pos.getY());
+            sprite.setScale(transform.scale.getX() + 0.001, transform.scale.getY() + 0.001);
+
+            m_game->window().draw(sprite);
+        }
+
+        for (const std::shared_ptr<Entity>& entity : m_entityManager.getEntities("Piece"))
+        {
+            if (entity != cPlayer.selectedPiece)
             {
-                continue;
+                CTransform& transform = entity->getComponent<CTransform>();
+
+                sf::Sprite& sprite = entity->getComponent<CSprite>().sprite;
+
+                sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
+                sprite.setRotation(transform.angle);
+                sprite.setPosition(transform.pos.getX(), transform.pos.getY());
+                sprite.setScale(transform.scale.getX(), transform.scale.getY());
+
+                m_game->window().draw(sprite);
+            }
+        }
+
+        if (cPlayer.selectedPiece)
+        {
+            // DRAW MOVE/TAKE HEXES
+            const CPiece& cPiece = cPlayer.selectedPiece->getComponent<CPiece>();
+
+            for (const Vec2& vec : cPiece.moveSet)
+            {
+                sf::CircleShape circle(14, 30);
+
+                Vec2 axialPos = axialToPixel(vec);
+
+                circle.setPosition(axialPos.getX(), axialPos.getY());
+                circle.setOrigin(circle.getRadius(), circle.getRadius());
+                circle.setFillColor(sf::Color(114, 121, 143, 150));
+
+                m_game->window().draw(circle);
             }
 
-            if (entity->hasComponent<CSprite>() && entity->hasComponent<CTransform>())
+            for (const Vec2& vec : cPiece.takeSet)
             {
-                if (entity->tag() == "Tile")
-                {
-                    CTransform& transform = entity->getComponent<CTransform>();
+                sf::CircleShape circle(25, 30);
 
-                    sf::Sprite& sprite = entity->getComponent<CSprite>().sprite;
+                Vec2 axialPos = axialToPixel(vec);
 
-                    sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
-                    sprite.setRotation(transform.angle);
-                    sprite.setPosition(transform.pos.getX(), transform.pos.getY());
-                    sprite.setScale(transform.scale.getX() + 0.001, transform.scale.getY() + 0.001);
+                circle.setPosition(axialPos.getX(), axialPos.getY());
+                circle.setOrigin(circle.getRadius(), circle.getRadius());
+                circle.setFillColor(sf::Color(0, 0, 0, 0));
+                circle.setOutlineColor(sf::Color(114, 121, 143, 150));
+                circle.setOutlineThickness(4);
 
-                    m_game->window().draw(sprite);
-                }
-                else
-                {
-                    CTransform& transform = entity->getComponent<CTransform>();
-
-                    sf::Sprite& sprite = entity->getComponent<CSprite>().sprite;
-
-                    sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
-                    sprite.setRotation(transform.angle);
-                    sprite.setPosition(transform.pos.getX(), transform.pos.getY());
-                    sprite.setScale(transform.scale.getX(), transform.scale.getY());
-
-                    m_game->window().draw(sprite);
-
-                }
+                m_game->window().draw(circle);
             }
+
+            // DRAW PICKED UP PIECE
+            CTransform& transform = cPlayer.selectedPiece->getComponent<CTransform>();
+
+            sf::Sprite& sprite = cPlayer.selectedPiece->getComponent<CSprite>().sprite;
+
+            sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
+            sprite.setRotation(transform.angle);
+            sprite.setPosition(transform.pos.getX(), transform.pos.getY());
+            sprite.setScale(transform.scale.getX() * 1.5, transform.scale.getY() * 1.5);
+
+            m_game->window().draw(sprite);
         }
     }
 
@@ -361,17 +407,97 @@ Vec2 ScenePlay::getAxialFromGridPiece(const std::shared_ptr<Entity>& piece)
 }
 
 
-void ScenePlay::movePiece(const Vec2& targetPosition, std::shared_ptr<Entity> piece)
+void ScenePlay::movePiece(const Vec2& targetPosition, const std::shared_ptr<Entity>& piece)
 {
     if (!onBoard(targetPosition)) { return ; }
 
     Vec2 originalPosition = getAxialFromGridPiece(piece);
+    CPiece& cPiece = piece->getComponent<CPiece>();
 
-    if (originalPosition != targetPosition && !m_grid[targetPosition])
+    if (originalPosition != targetPosition)
     {
-        CTransform& pieceTransform = piece->getComponent<CTransform>();
-        pieceTransform.pos = axialToPixel(targetPosition);
-        m_grid[targetPosition] = piece;
-        m_grid[originalPosition] = nullptr;
+        // IF TARGET POSITION IN MOVESET
+        if (m_grid[targetPosition])
+        {
+            if (std::find(cPiece.takeSet.begin(), cPiece.takeSet.end(), targetPosition) != cPiece.takeSet.end())
+            {
+                m_grid[targetPosition]->destroy();
+                m_grid[targetPosition] = piece;
+                m_grid[originalPosition] = nullptr;
+
+                CTransform& pieceTransform = piece->getComponent<CTransform>();
+                pieceTransform.pos = axialToPixel(targetPosition);
+
+                whiteToMove = !whiteToMove;
+            }
+        }
+        else
+        {
+            if (std::find(cPiece.moveSet.begin(), cPiece.moveSet.end(), targetPosition) != cPiece.moveSet.end())
+            {
+                CTransform& pieceTransform = piece->getComponent<CTransform>();
+                pieceTransform.pos = axialToPixel(targetPosition);
+                m_grid[targetPosition] = piece;
+                m_grid[originalPosition] = nullptr;
+
+                whiteToMove = !whiteToMove;
+            }
+        }
+    }
+}
+
+void ScenePlay::calculateMoveSet(const Vec2& pos, std::shared_ptr<Entity> piece)
+{
+    CPiece& cPiece = piece->getComponent<CPiece>();
+    cPiece.moveSet.clear();
+    cPiece.takeSet.clear();
+
+    switch (cPiece.type)
+    {
+    case 1:
+        //calculateKingMoveSet(pos, cPiece):
+        break;
+    case 2:
+        calculatePawnMoveSet(pos, cPiece);
+        break;
+    default:
+        break;
+    }
+}
+
+void ScenePlay::calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece)
+{
+    if (cPiece.type == 2)
+    {
+        int color = (cPiece.color) ? 1 : -1 ;
+
+        Vec2 moves[2] = { Vec2(0, 1) * color, Vec2(0, 2) * color };
+
+        if (onBoard(pos + moves[0]) && !m_grid[pos + moves[0]])
+        {
+            cPiece.moveSet.push_back(pos + moves[0]);
+        }
+
+        // If first pawn move and not entity in 2 squares up:
+        if (onBoard(pos + moves[1]) && !m_grid[pos + moves[1]])
+        {
+            if ((pos.getX() + pos.getY() == -1 * color && pos.getY() * color <= -1) || (pos.getX() * color <= -1 && pos.getY() == -1 * color))
+            {
+                cPiece.moveSet.push_back(pos + moves[1]);
+            }
+        }
+
+        Vec2 takes[2] = { Vec2(-1, 1) * color, Vec2(1, 0) * color };
+
+        for (Vec2& take : takes)
+        {
+            if (onBoard(pos + take) && m_grid[pos + take])
+            {
+                if (m_grid[pos + take]->getComponent<CPiece>().color == !cPiece.color)
+                {
+                    cPiece.takeSet.push_back(pos + take);
+                }
+            }
+        }
     }
 }
