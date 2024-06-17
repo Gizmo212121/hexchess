@@ -77,7 +77,7 @@ void ScenePlay::initializePieces()
     std::string intToType[6] = { "King", "Pawn", "Knight", "Bishop", "Rook", "Queen" };
     char color[2] = { 'b', 'w' };
 
-for (size_t i = 0; i < pieces.size(); i++)
+    for (size_t i = 0; i < pieces.size(); i++)
     {
         for (const Vec2& axialPos : pieces[i])
         {
@@ -87,7 +87,6 @@ for (size_t i = 0; i < pieces.size(); i++)
 
                 piece->addComponent<CSprite>(*m_game->assets().getTexture(color[colorIndex] + intToType[i]));
                 piece->addComponent<CPiece>(colorIndex, i + 1);
-                piece->addComponent<CState>();
 
                 CTransform& pieceTransform = piece->addComponent<CTransform>();
                 pieceTransform.scale /= 14;
@@ -99,9 +98,18 @@ for (size_t i = 0; i < pieces.size(); i++)
                 }
                 else
                 {
-                    Vec2 blackAxialPos = axialPos * -1;
-                    pieceTransform.pos = axialToPixel(blackAxialPos);
-                    m_grid[blackAxialPos] = piece;
+                    if (i == 0 || i == 5)
+                    {
+                        Vec2 kingQueenPos(axialPos.getX(), axialPos.getY() + 9);
+                        pieceTransform.pos = axialToPixel(kingQueenPos);
+                        m_grid[kingQueenPos] = piece;
+                    }
+                    else
+                    {
+                        Vec2 blackAxialPos = axialPos * -1;
+                        pieceTransform.pos = axialToPixel(blackAxialPos);
+                        m_grid[blackAxialPos] = piece;
+                    }
                 }
             }
         }
@@ -176,7 +184,8 @@ void ScenePlay::sDoAction(const Action& action)
         else if (action.name() == "MOUSE_LEFT") 
         { 
             CPlayer& player = m_player->getComponent<CPlayer>();
-            if (!player.isClicked) { player.isClicked = true ; }
+
+            if (!player.isCurrentlyClicked) { player.isCurrentlyClicked = true ; }
         }
     }
     else if (action.type() == "END")
@@ -184,7 +193,8 @@ void ScenePlay::sDoAction(const Action& action)
         if (action.name() == "MOUSE_LEFT")
         {
             CPlayer& player = m_player->getComponent<CPlayer>();
-            if (player.isClicked) { player.isClicked = false; }
+
+            if (player.isCurrentlyClicked) { player.isCurrentlyClicked = false; }
         }
     }
 }
@@ -197,7 +207,7 @@ void ScenePlay::sMouseInput()
 
     Vec2 mousePos = Vec2(mousePosSF.x - windowBounds.x / 2.0, windowBounds.y - mousePosSF.y - windowBounds.y / 2.0);
 
-    if (player.isClicked)
+    if (player.isCurrentlyClicked)
     {
         if (!player.selectedPiece)
         {
@@ -221,6 +231,9 @@ void ScenePlay::sMouseInput()
     {
         CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
         pieceTransform.pos = axialToPixel(getAxialFromGridPiece(m_player->getComponent<CPlayer>().selectedPiece));
+
+        movePiece(pixelToAxial(mousePos), player.selectedPiece);
+
         player.selectedPiece = nullptr;
     }
 }
@@ -332,7 +345,7 @@ Vec2 ScenePlay::pixelToAxial(const Vec2& vec)
 
 bool ScenePlay::onBoard(const Vec2& vec)
 {
-    return (std::max(fabs(vec.getX()), fabs(vec.getY())) <= 5);
+    return ((fabs(vec.getX()) + fabs(vec.getY()) + fabs(- vec.getX() - vec.getY())) / 2 <= 5);
 }
 
 Vec2 ScenePlay::getAxialFromGridPiece(const std::shared_ptr<Entity>& piece)
@@ -345,4 +358,20 @@ Vec2 ScenePlay::getAxialFromGridPiece(const std::shared_ptr<Entity>& piece)
     std::cerr << "Get Axial Position From Grid Piece Search Failed!\n";
     exit(1);
     return Vec2(0, 0);
+}
+
+
+void ScenePlay::movePiece(const Vec2& targetPosition, std::shared_ptr<Entity> piece)
+{
+    if (!onBoard(targetPosition)) { return ; }
+
+    Vec2 originalPosition = getAxialFromGridPiece(piece);
+
+    if (originalPosition != targetPosition && !m_grid[targetPosition])
+    {
+        CTransform& pieceTransform = piece->getComponent<CTransform>();
+        pieceTransform.pos = axialToPixel(targetPosition);
+        m_grid[targetPosition] = piece;
+        m_grid[originalPosition] = nullptr;
+    }
 }

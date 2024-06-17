@@ -60,21 +60,11 @@ public:
     }
 };
 
-class CState : public Component
-{
-public:
-    bool isLifted = false;
-    
-    CState() {}
-    CState(const bool lift)
-        : isLifted(lift) {}
-};
-
 class CPlayer : public Component
 {
 public:
     std::shared_ptr<Entity> selectedPiece = nullptr;
-    bool isClicked = false;
+    bool isCurrentlyClicked = false;
 
     CPlayer() {}
     CPlayer(const std::shared_ptr<Entity>& e)

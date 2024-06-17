@@ -39,9 +39,12 @@ protected:
     float m_size = 121.0 / 3;
     Vec2 axialToPixel(const Vec2& vec);
     Vec2 pixelToAxial(const Vec2& vec);
-    
+
     bool onBoard(const Vec2& vec);
     Vec2 getAxialFromGridPiece(const std::shared_ptr<Entity>& piece);
+
+    void movePiece(const Vec2& targetPosition, std::shared_ptr<Entity> piece);
+
 
     void onEnd() override;
 
