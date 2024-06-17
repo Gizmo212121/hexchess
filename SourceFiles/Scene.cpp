@@ -30,10 +30,16 @@ void Scene::simulate(const size_t frames)
     }
 }
 
-void Scene::registerAction(int inputKey, const std::string& actionName)
+void Scene::registerKeyboardAction(int inputKey, const std::string& actionName)
 {
     std::cout << "Registering action with key: " << inputKey << " and name: " << actionName << std::endl;
     m_actionMap[inputKey] = actionName;
+}
+
+void Scene::registerMouseAction(int inputKey, const std::string& actionName)
+{
+    std::cout << "Registering action with key: " << inputKey << " and name: " << actionName << std::endl;
+    m_actionMap[inputKey + 1000] = actionName;
 }
 
 size_t Scene::height() const

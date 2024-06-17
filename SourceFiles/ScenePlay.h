@@ -29,6 +29,8 @@ protected:
 
     std::unordered_map<Vec2, std::shared_ptr<Entity>, Vec2Hash> m_grid;
 
+    std::shared_ptr<Entity> m_player;
+
     void init();
     void initializeAxialCoordinateGrid();
     void initializeTiles();
@@ -36,6 +38,10 @@ protected:
 
     float m_size = 121.0 / 3;
     Vec2 axialToPixel(const Vec2& vec);
+    Vec2 pixelToAxial(const Vec2& vec);
+    
+    bool onBoard(const Vec2& vec);
+    Vec2 getAxialFromGridPiece(const std::shared_ptr<Entity>& piece);
 
     void onEnd() override;
 
@@ -44,8 +50,11 @@ public:
 
     ScenePlay(GameEngine* gameEngine);
 
+    bool whiteToMove = true;
+
     void update() override;
     void sDoAction(const Action& action) override;
+    void sMouseInput();
 
     void sRender() override;
 };

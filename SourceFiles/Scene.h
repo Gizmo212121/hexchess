@@ -35,7 +35,8 @@ public:
 
     void doAction(const Action& action);
     void simulate(const size_t frames);
-    void registerAction(int inputKey, const std::string& actionName);
+    void registerKeyboardAction(int inputKey, const std::string& actionName);
+    void registerMouseAction(int inputKey, const std::string& actionName);
 
     size_t width() const;
     size_t height() const;

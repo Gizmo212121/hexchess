@@ -10,7 +10,8 @@ typedef std::tuple<
     CTransform,
     CPiece,
     CState,
-    CSprite
+    CSprite,
+    CPlayer
 > ComponentTuple;
 
 class Entity

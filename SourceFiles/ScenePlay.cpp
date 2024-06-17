@@ -4,6 +4,7 @@
 #include "GameEngine.h"
 #include "Components.h"
 #include "Action.h"
+#include "Vec2.h"
 #include <memory>
 #include <cmath>
 
@@ -17,16 +18,19 @@ ScenePlay::ScenePlay(GameEngine* gameEngine)
 
 void ScenePlay::init()
 {
-    registerAction(sf::Keyboard::P, "PAUSE");
-    registerAction(sf::Keyboard::Escape, "QUIT");
-    registerAction(sf::Keyboard::T, "TOGGLE_TEXTURE");
-    registerAction(sf::Keyboard::G, "TOGGLE_GRID");
+    registerKeyboardAction(sf::Keyboard::P, "PAUSE");
+    registerKeyboardAction(sf::Keyboard::Escape, "QUIT");
+    registerKeyboardAction(sf::Keyboard::T, "TOGGLE_TEXTURE");
+    registerKeyboardAction(sf::Keyboard::G, "TOGGLE_GRID");
+    registerMouseAction(sf::Mouse::Left, "MOUSE_LEFT");
 
     m_gridText.setCharacterSize(12);
     m_gridText.setFont(m_game->assets().getFont("Arial"));
 
     m_entityManager = EntityManager();
 
+    m_player = m_entityManager.addEntity("Player");
+    m_player->addComponent<CPlayer>();
 
     initializeAxialCoordinateGrid();
     initializeTiles();
@@ -34,13 +38,103 @@ void ScenePlay::init()
 
 }
 
+void ScenePlay::initializeAxialCoordinateGrid()
+{
+    for (int q = -5; q <= 5; q++)
+    {
+        int r1 = std::max(-5, -q - 5);
+        int r2 = std::min(5, -q + 5);
+        for (int r = r1; r <= r2; r++)
+        {
+            m_grid[Vec2(q, r)] = nullptr;
+        }
+    }
+}
+
+void ScenePlay::initializePieces()
+{
+    std::vector<std::vector<Vec2>> pieces;
+
+
+    std::vector pawnPositions =
+    {   Vec2(-4, -1), Vec2(-3, -1), Vec2(-2, -1),
+        Vec2(-1, -1), Vec2( 0, -1), Vec2( 1, -2),
+        Vec2( 2, -3), Vec2( 3, -4), Vec2( 4, -5), };
+    std::vector bishopPositions = { Vec2( 0, -3), Vec2( 0, -4), Vec2( 0, -5) };
+    std::vector knightPositions = { Vec2(-2, -3), Vec2( 2, -5) };
+    std::vector rookPositions =   { Vec2(-3, -2), Vec2( 3, -5) };
+    std::vector queenPositions =  { Vec2(-1, -4) };
+    std::vector kingPosition =    { Vec2( 1, -5) };
+
+    pieces.push_back(kingPosition);
+    pieces.push_back(pawnPositions);
+    pieces.push_back(knightPositions);
+    pieces.push_back(bishopPositions);
+    pieces.push_back(rookPositions);
+    pieces.push_back(queenPositions);
+
+
+    std::string intToType[6] = { "King", "Pawn", "Knight", "Bishop", "Rook", "Queen" };
+    char color[2] = { 'b', 'w' };
+
+for (size_t i = 0; i < pieces.size(); i++)
+    {
+        for (const Vec2& axialPos : pieces[i])
+        {
+            for (int colorIndex = 0; colorIndex < 2; colorIndex++)
+            {
+                std::shared_ptr<Entity> piece = m_entityManager.addEntity("Piece");
+
+                piece->addComponent<CSprite>(*m_game->assets().getTexture(color[colorIndex] + intToType[i]));
+                piece->addComponent<CPiece>(colorIndex, i + 1);
+                piece->addComponent<CState>();
+
+                CTransform& pieceTransform = piece->addComponent<CTransform>();
+                pieceTransform.scale /= 14;
+
+                if (colorIndex)
+                {
+                    pieceTransform.pos = axialToPixel(axialPos);
+                    m_grid[axialPos] = piece;
+                }
+                else
+                {
+                    Vec2 blackAxialPos = axialPos * -1;
+                    pieceTransform.pos = axialToPixel(blackAxialPos);
+                    m_grid[blackAxialPos] = piece;
+                }
+            }
+        }
+    }
+}
+
+void ScenePlay::initializeTiles()
+{
+    for (auto it : m_grid)
+    {
+        std::shared_ptr<Entity> hex = m_entityManager.addEntity("Tile");
+
+        std::string hexAssetName;
+
+        int code = (int)it.first.getX() - (int)it.first.getY();
+
+        if (code % 3 == 0) {  hexAssetName = "Hex1"; }
+        else if (code % 3 == -1) { hexAssetName = "Hex2"; }
+        else if (code % 3 == 2) { hexAssetName = "Hex2"; }
+        else { hexAssetName = "Hex0"; }
+
+        hex->addComponent<CSprite>(*m_game->assets().getTexture(hexAssetName));
+        CTransform& transform = hex->addComponent<CTransform>();
+        transform.pos = axialToPixel(it.first);
+        transform.scale /= 3;
+    }
+}
 
 void ScenePlay::onEnd()
 {
     m_game->window().clear(sf::Color(0, 0, 0, 255));
     m_game->changeScene("MENU", std::make_shared<SceneMenu>(m_game));
 }
-
 
 void ScenePlay::update()
 {
@@ -53,6 +147,7 @@ void ScenePlay::update()
     }
     else
     {
+        sMouseInput();
         sRender();
     }
 
@@ -68,9 +163,7 @@ void ScenePlay::update()
     */
 
     m_currentFrame++;
-    std::cout << m_currentFrame << std::endl;
 }
-
 
 void ScenePlay::sDoAction(const Action& action)
 {
@@ -80,12 +173,57 @@ void ScenePlay::sDoAction(const Action& action)
         else if (action.name() == "TOGGLE_GRID") { m_drawGrid = !m_drawGrid ; }
         else if (action.name() == "PAUSE") { setPaused(!m_paused) ; }
         else if (action.name() == "QUIT") { onEnd() ; }
+        else if (action.name() == "MOUSE_LEFT") 
+        { 
+            CPlayer& player = m_player->getComponent<CPlayer>();
+            if (!player.isClicked) { player.isClicked = true ; }
+        }
     }
     else if (action.type() == "END")
     {
+        if (action.name() == "MOUSE_LEFT")
+        {
+            CPlayer& player = m_player->getComponent<CPlayer>();
+            if (player.isClicked) { player.isClicked = false; }
+        }
     }
 }
 
+void ScenePlay::sMouseInput()
+{
+    CPlayer& player = m_player->getComponent<CPlayer>();
+    sf::Vector2i mousePosSF = sf::Mouse::getPosition(m_game->window());
+    sf::Vector2 windowBounds = m_game->window().getSize();
+
+    Vec2 mousePos = Vec2(mousePosSF.x - windowBounds.x / 2.0, windowBounds.y - mousePosSF.y - windowBounds.y / 2.0);
+
+    if (player.isClicked)
+    {
+        if (!player.selectedPiece)
+        {
+            Vec2 axialPos = pixelToAxial(mousePos);
+            std::cout << axialPos << std::endl;
+            std::cout << mousePos << std::endl;
+
+            if (onBoard(axialPos))
+            {
+                player.selectedPiece = m_grid[axialPos];
+            }
+        }
+        else
+        {
+            CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
+
+            pieceTransform.pos = Vec2(mousePosSF.x, mousePosSF.y);
+        }
+    }
+    else if (player.selectedPiece)
+    {
+        CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
+        pieceTransform.pos = axialToPixel(getAxialFromGridPiece(m_player->getComponent<CPlayer>().selectedPiece));
+        player.selectedPiece = nullptr;
+    }
+}
 
 void ScenePlay::sRender()
 {
@@ -115,7 +253,6 @@ void ScenePlay::sRender()
 
     if (m_drawTextures)
     {
-        std::cout << "Drawing textures\n";
         for (const std::shared_ptr<Entity>& entity : m_entityManager.getEntities())
         {
             if (entity->tag() == "Background")
@@ -175,91 +312,6 @@ void ScenePlay::sRender()
     m_game->window().display();
 }
 
-
-void ScenePlay::initializeAxialCoordinateGrid()
-{
-    for (int q = -5; q <= 5; q++)
-    {
-        int r1 = std::max(-5, -q - 5);
-        int r2 = std::min(5, -q + 5);
-        for (int r = r1; r <= r2; r++)
-        {
-            m_grid[Vec2(q, r)] = nullptr;
-        }
-    }
-}
-
-void ScenePlay::initializePieces()
-{
-    std::vector<std::vector<Vec2>> pieces;
-
-    std::vector kingPosition = {Vec2(1, -5)};
-    pieces.push_back(kingPosition);
-
-    std::vector pawnPositions =
-    { 
-        Vec2(-4, -1), Vec2(-3, -1), Vec2(-2, -1),
-        Vec2(-1, -1), Vec2( 0, -1), Vec2( 1, -2),
-        Vec2( 2, -3), Vec2( 3, -4), Vec2( 4, -5),
-    };
-    pieces.push_back(pawnPositions);
-
-    std::vector knightPositions =
-    {
-        Vec2(-2, -3), Vec2(2, -5)
-    };
-    pieces.push_back(knightPositions);
-
-    std::vector bishopPositions =
-    {
-        Vec2(0, -3), Vec2(0, -4), Vec2(0, -5)
-    };
-    pieces.push_back(bishopPositions);
-
-    std::vector rookPositions =
-    {
-        Vec2(-3, -2), Vec2(3, -5)
-    };
-    pieces.push_back(rookPositions);
-
-    std::vector queenPositions = {Vec2(-1, -4)};
-    pieces.push_back(queenPositions);
-
-
-    std::string intToType[6] = { "King", "Pawn", "Knight", "Bishop", "Rook", "Queen" };
-    char color[2] = { 'b', 'w' };
-
-    for (size_t i = 0; i < pieces.size(); i++)
-    {
-        for (const Vec2& axialPos : pieces[i])
-        {
-            for (int colorIndex = 0; colorIndex < 2; colorIndex++)
-            {
-                std::shared_ptr<Entity> piece = m_entityManager.addEntity("Piece");
-
-                piece->addComponent<CSprite>(*m_game->assets().getTexture(color[colorIndex] + intToType[i]));
-                piece->addComponent<CPiece>(colorIndex, i + 1);
-                piece->addComponent<CState>();
-
-                CTransform& pieceTransform = piece->addComponent<CTransform>();
-                pieceTransform.scale /= 14;
-
-                if (!colorIndex)
-                {
-                    pieceTransform.pos = axialToPixel(axialPos);
-                    m_grid[axialPos] = piece;
-                }
-                else
-                {
-                    Vec2 blackAxialPos = axialPos * -1;
-                    pieceTransform.pos = axialToPixel(blackAxialPos);
-                    m_grid[blackAxialPos] = piece;
-                }
-            }
-        }
-    }
-}
-
 Vec2 ScenePlay::axialToPixel(const Vec2& vec)
 {
     float x = m_size * (3.0 / 2 * vec.getX());
@@ -271,25 +323,26 @@ Vec2 ScenePlay::axialToPixel(const Vec2& vec)
     return Vec2(viewportXHalf + x, viewportYHalf - y);
 }
 
-void ScenePlay::initializeTiles()
+Vec2 ScenePlay::pixelToAxial(const Vec2& vec)
+{
+    float x = (2.0 / 3 * vec.getX()) / m_size;
+    float y = (-1.0 / 3 * vec.getX() + sqrt(3) / 3 * vec.getY()) / m_size;
+    return Vec2(round(x), round(y));
+}
+
+bool ScenePlay::onBoard(const Vec2& vec)
+{
+    return (std::max(fabs(vec.getX()), fabs(vec.getY())) <= 5);
+}
+
+Vec2 ScenePlay::getAxialFromGridPiece(const std::shared_ptr<Entity>& piece)
 {
     for (auto it : m_grid)
     {
-        std::shared_ptr<Entity> hex = m_entityManager.addEntity("Tile");
-
-        std::string hexAssetName;
-
-        int code = (int)it.first.getX() - (int)it.first.getY();
-
-        if (code % 3 == 0) {  hexAssetName = "Hex1"; }
-        else if (code % 3 == -1) { hexAssetName = "Hex2"; }
-        else if (code % 3 == 2) { hexAssetName = "Hex2"; }
-        else { hexAssetName = "Hex0"; }
-
-        hex->addComponent<CSprite>(*m_game->assets().getTexture(hexAssetName));
-        CTransform& transform = hex->addComponent<CTransform>();
-        transform.pos = axialToPixel(it.first);
-        transform.scale /= 3;
-
+        if (it.second == piece) { return it.first ; }
     }
+
+    std::cerr << "Get Axial Position From Grid Piece Search Failed!\n";
+    exit(1);
+    return Vec2(0, 0);
 }

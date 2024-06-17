@@ -10,8 +10,8 @@ SceneMenu::SceneMenu(GameEngine* gameEngine)
 
 void SceneMenu::init()
 {
-    registerAction(sf::Keyboard::Escape, "QUIT");
-    registerAction(sf::Keyboard::B, "START_LEVEL");
+    registerKeyboardAction(sf::Keyboard::Escape, "QUIT");
+    registerKeyboardAction(sf::Keyboard::B, "START_LEVEL");
 }
 
 void SceneMenu::update()

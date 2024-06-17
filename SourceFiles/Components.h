@@ -3,6 +3,8 @@
 #include "Assets.h"
 #include <unordered_map>
 
+class Entity;
+
 class Component
 {
 public:
@@ -66,4 +68,15 @@ public:
     CState() {}
     CState(const bool lift)
         : isLifted(lift) {}
+};
+
+class CPlayer : public Component
+{
+public:
+    std::shared_ptr<Entity> selectedPiece = nullptr;
+    bool isClicked = false;
+
+    CPlayer() {}
+    CPlayer(const std::shared_ptr<Entity>& e)
+        : selectedPiece(e) {}
 };
