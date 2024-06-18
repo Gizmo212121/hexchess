@@ -155,6 +155,7 @@ void ScenePlay::update()
     }
     else
     {
+        sUpdateMoveSets();
         sMouseInput();
         sRender();
     }
@@ -283,7 +284,6 @@ void ScenePlay::sMouseInput()
                     {
                         // Select another piece
                         player.selectedPiece = pieceOnClickedHex;
-                        calculateMoveSet(clickedPiecePosition, pieceOnClickedHex);
                     }
                 }
                 else
@@ -319,7 +319,6 @@ void ScenePlay::sMouseInput()
                     player.selectedPiece = pieceOnClickedHex;
 
                     Vec2 clickedPiecePosition = getAxialFromGridPiece(pieceOnClickedHex);
-                    calculateMoveSet(clickedPiecePosition, pieceOnClickedHex);
 
                     isCurrentlyDragging = true;
                 }
@@ -540,6 +539,7 @@ void ScenePlay::movePiece(const Vec2& targetPosition, const std::shared_ptr<Enti
                 pieceTransform.pos = axialToPixel(targetPosition);
 
                 whiteToMove = !whiteToMove;
+                nextTurn = true;
             }
         }
         else
@@ -552,222 +552,129 @@ void ScenePlay::movePiece(const Vec2& targetPosition, const std::shared_ptr<Enti
                 m_grid[originalPosition] = nullptr;
 
                 whiteToMove = !whiteToMove;
+                nextTurn = true;
             }
         }
     }
 }
 
-void ScenePlay::calculateMoveSet(const Vec2& pos, std::shared_ptr<Entity> piece)
+void ScenePlay::sUpdateMoveSets()
 {
-    CPiece& cPiece = piece->getComponent<CPiece>();
-    cPiece.moveSet.clear();
-    cPiece.takeSet.clear();
-
-    switch (cPiece.type)
+    if (nextTurn)
     {
-    case 1:
-        calculateKingMoveSet(pos, cPiece);
-        break;
-    case 2:
-        calculatePawnMoveSet(pos, cPiece);
-        break;
-    case 3:
-        calculateKnightMoveSet(pos, cPiece);
-        break;
-    case 4:
-        calculateBishopMoveSet(pos, cPiece);
-        break;
-    case 5:
-        calculateRookMoveSet(pos, cPiece);
-        break;
-    case 6:
-        calculateBishopMoveSet(pos, cPiece);
-        calculateRookMoveSet(pos, cPiece);
-        calculateLastQueenMoveSet(pos, cPiece);
-        break;
-    default:
-        break;
+        for (auto& it : m_grid)
+        {
+            if (it.second)
+            {
+                CPiece& pieceComponent = it.second->getComponent<CPiece>();
+
+                pieceComponent.moveSet.clear();
+                pieceComponent.takeSet.clear();
+
+                switch (pieceComponent.type)
+                {
+                case 1:
+                    // King
+                    calculateBidirectionalMoveSet(it.first, pieceComponent, m_adjacentPositions, 6, false);
+                    calculateBidirectionalMoveSet(it.first, pieceComponent, m_bishopDiagonalPositions, 4, false);
+                    calculateBidirectionalMoveSet(it.first, pieceComponent, m_queenDiagonalPositions, 2, false);
+                    break;
+                case 2:
+                    // Pawn
+                    calculatePawnMoveSet(it.first, pieceComponent);
+                    break;
+                case 3:
+                    // Knight
+                    calculateBidirectionalMoveSet(it.first, pieceComponent, m_knightMovePositions, 12, false);
+                    break;
+                case 4:
+                    // Bishop
+                    calculateBidirectionalMoveSet(it.first, pieceComponent, m_bishopDiagonalPositions, 4, true);
+                    break;
+                case 5:
+                    // Rook
+                    calculateBidirectionalMoveSet(it.first, pieceComponent, m_adjacentPositions, 6, true);
+                    break;
+                case 6:
+                    // Queen
+                    calculateBidirectionalMoveSet(it.first, pieceComponent, m_bishopDiagonalPositions, 6, true);
+                    calculateBidirectionalMoveSet(it.first, pieceComponent, m_adjacentPositions, 6, true);
+                    calculateBidirectionalMoveSet(it.first, pieceComponent, m_queenDiagonalPositions, 2, true);
+                    break;
+                default:
+                    std::cerr << "Unexpected piece value given!\n";
+                    exit(1);
+                    break;
+                }
+            }
+        }
+
+        nextTurn = false;
     }
 }
 
 void ScenePlay::calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece)
 {
-    if (cPiece.type == 2)
+    int color = (cPiece.color) ? 1 : -1 ;
+
+    Vec2 takes[2] = { Vec2(-1, 1) * color, Vec2(1, 0) * color };
+
+    for (Vec2& take : takes)
     {
-        int color = (cPiece.color) ? 1 : -1 ;
-
-        Vec2 takes[2] = { Vec2(-1, 1) * color, Vec2(1, 0) * color };
-
-        for (Vec2& take : takes)
+        if (onBoard(pos + take) && m_grid[pos + take])
         {
-            if (onBoard(pos + take) && m_grid[pos + take])
+            if (m_grid[pos + take]->getComponent<CPiece>().color == !cPiece.color)
             {
-                if (m_grid[pos + take]->getComponent<CPiece>().color == !cPiece.color)
-                {
-                    cPiece.takeSet.push_back(pos + take);
-                }
+                cPiece.takeSet.push_back(pos + take);
             }
         }
+    }
 
-        Vec2 moves[2] = { Vec2(0, 1) * color, Vec2(0, 2) * color };
+    Vec2 moves[2] = { Vec2(0, 1) * color, Vec2(0, 2) * color };
 
-        if (onBoard(pos + moves[0]) && !m_grid[pos + moves[0]])
+    if (onBoard(pos + moves[0]) && !m_grid[pos + moves[0]])
+    {
+        cPiece.moveSet.push_back(pos + moves[0]);
+    }
+    else { return; }
+
+    // If first pawn move and not entity in 2 squares up:
+    if (onBoard(pos + moves[1]) && !m_grid[pos + moves[1]])
+    {
+        if ((pos.getX() + pos.getY() == -1 * color && pos.getY() * color <= -1) || (pos.getX() * color <= -1 && pos.getY() == -1 * color))
         {
-            cPiece.moveSet.push_back(pos + moves[0]);
+            cPiece.moveSet.push_back(pos + moves[1]);
         }
-        else { return; }
-
-        // If first pawn move and not entity in 2 squares up:
-        if (onBoard(pos + moves[1]) && !m_grid[pos + moves[1]])
-        {
-            if ((pos.getX() + pos.getY() == -1 * color && pos.getY() * color <= -1) || (pos.getX() * color <= -1 && pos.getY() == -1 * color))
-            {
-                cPiece.moveSet.push_back(pos + moves[1]);
-            }
-        }
-
     }
 }
 
-void ScenePlay::calculateBishopMoveSet(const Vec2& pos, CPiece& cPiece)
+void ScenePlay::calculateBidirectionalMoveSet(const Vec2& pos, CPiece& piece, Vec2 moveDirections[], int moveDirectionsSize, bool loop)
 {
-    Vec2 moves[4] = { Vec2(1, 1), Vec2(-1, 2), Vec2(-1, -1), Vec2(1, -2) };
-
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < moveDirectionsSize; i++)
     {
         int distanceMultiplier = 1;
 
-        while (onBoard(pos + moves[i] * distanceMultiplier))
+        while (onBoard(pos + moveDirections[i] * distanceMultiplier))
         {
-            std::shared_ptr<Entity> entityAtSearchedHex = m_grid[pos + moves[i] * distanceMultiplier];
+            std::shared_ptr<Entity> entityAtSearchedHex = m_grid[pos + moveDirections[i] * distanceMultiplier];
 
             if (!entityAtSearchedHex)
             {
-                cPiece.moveSet.push_back(pos + moves[i] * distanceMultiplier);
+                piece.moveSet.push_back(pos + moveDirections[i] * distanceMultiplier);
             }
             else
             {
                 if (!entityAtSearchedHex->getComponent<CPiece>().color == whiteToMove)
                 {
-                    cPiece.takeSet.push_back(pos + moves[i] * distanceMultiplier);
+                    piece.takeSet.push_back(pos + moveDirections[i] * distanceMultiplier);
                 }
 
                 break;
             }
 
-            distanceMultiplier++;
-        }
-    }
-}
-
-void ScenePlay::calculateRookMoveSet(const Vec2& pos, CPiece& cPiece)
-{
-    Vec2 moves[6] = { Vec2(0, 1), Vec2(1, 0), Vec2(1, -1), Vec2(0, -1), Vec2(-1, 0), Vec2(-1, 1) };
-
-    for (int i = 0; i < 6; i++)
-    {
-        int distanceMultiplier = 1;
-
-        while (onBoard(pos + moves[i] * distanceMultiplier))
-        {
-            std::shared_ptr<Entity> entityAtSearchedHex = m_grid[pos + moves[i] * distanceMultiplier];
-
-            if (!entityAtSearchedHex)
-            {
-                cPiece.moveSet.push_back(pos + moves[i] * distanceMultiplier);
-            }
-            else
-            {
-                if (!entityAtSearchedHex->getComponent<CPiece>().color == whiteToMove)
-                {
-                    cPiece.takeSet.push_back(pos + moves[i] * distanceMultiplier);
-                }
-
-                break;
-            }
+            if (!loop) { break ;}
 
             distanceMultiplier++;
-        }
-    }
-}
-
-void ScenePlay::calculateLastQueenMoveSet(const Vec2& pos, CPiece& cPiece)
-{
-    Vec2 moves[2] = { Vec2(-2, 1), Vec2(2, -1) };
-
-    for (int i = 0; i < 2; i++)
-    {
-        int distanceMultiplier = 1;
-
-        while (onBoard(pos + moves[i] * distanceMultiplier))
-        {
-            std::shared_ptr<Entity> entityAtSearchedHex = m_grid[pos + moves[i] * distanceMultiplier];
-
-            if (!entityAtSearchedHex)
-            {
-                cPiece.moveSet.push_back(pos + moves[i] * distanceMultiplier);
-            }
-            else
-            {
-                if (!entityAtSearchedHex->getComponent<CPiece>().color == whiteToMove)
-                {
-                    cPiece.takeSet.push_back(pos + moves[i] * distanceMultiplier);
-                }
-
-                break;
-            }
-
-            distanceMultiplier++;
-        }
-    }
-}
-
-void ScenePlay::calculateKnightMoveSet(const Vec2& pos, CPiece& cPiece)
-{
-    Vec2 moves[12] = { Vec2(1, 2), Vec2(2, 1), Vec2(3, -1), Vec2(3, -2), Vec2(2, -3), Vec2(1, -3), Vec2(-1, -2), Vec2(-2, -1), Vec2(-3, 1), Vec2(-3, 2), Vec2(-2, 3), Vec2(-1, 3) };
-
-    for (Vec2& move : moves)
-    {
-        if (onBoard(pos + move))
-        {
-            std::shared_ptr<Entity> entityAtSearchIndex = m_grid[pos + move];
-
-            if (!entityAtSearchIndex)
-            {
-                cPiece.moveSet.push_back(pos + move);
-            }
-            else
-            {
-                if (!entityAtSearchIndex->getComponent<CPiece>().color == whiteToMove)
-                {
-                    cPiece.takeSet.push_back(pos + move);
-                }
-            }
-        }
-    }
-}
-
-void ScenePlay::calculateKingMoveSet(const Vec2& pos, CPiece& cPiece)
-{
-    Vec2 moves[12] = { Vec2(0, 1), Vec2(1, 0), Vec2(1, -1), Vec2(0, -1), Vec2(-1, 0), Vec2(-1, 1), Vec2(-1, 2), Vec2(1, 1), Vec2(-2, 1), Vec2(2, -1), Vec2(-1, -1), Vec2(1, -2) };
-
-    for (Vec2& move : moves)
-    {
-        if (onBoard(pos + move))
-        {
-            std::shared_ptr<Entity> entityAtSearchIndex = m_grid[pos + move];
-
-            if (!entityAtSearchIndex)
-            {
-                cPiece.moveSet.push_back(pos + move);
-            }
-            else
-            {
-                if (!entityAtSearchIndex->getComponent<CPiece>().color == whiteToMove)
-                {
-                    cPiece.takeSet.push_back(pos + move);
-                }
-            }
         }
     }
 }

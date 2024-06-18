@@ -20,6 +20,13 @@ private:
         }
     };
 
+    Vec2 m_bishopDiagonalPositions[4] = { Vec2(1, 1), Vec2(-1, 2), Vec2(-1, -1), Vec2(1, -2) };
+    Vec2 m_queenDiagonalPositions[2] = { Vec2(-2, 1), Vec2(2, -1) };
+    Vec2 m_adjacentPositions[6] = { Vec2(0, 1), Vec2(1, 0), Vec2(1, -1), Vec2(0, -1), Vec2(-1, 0), Vec2(-1, 1) };
+    Vec2 m_pawnTakePositions[2] = { Vec2(-1, 1), Vec2(1, 0) };
+    Vec2 m_pawnMovePositions[2] = { Vec2(0, 1), Vec2(0, 2) };
+    Vec2 m_knightMovePositions[12] = { Vec2(1, 2), Vec2(2, 1), Vec2(3, -1), Vec2(3, -2), Vec2(2, -3), Vec2(1, -3), Vec2(-1, -2), Vec2(-2, -1), Vec2(-3, 1), Vec2(-3, 2), Vec2(-2, 3), Vec2(-1, 3) };
+
 protected:
 
     bool m_drawTextures = true;
@@ -44,9 +51,12 @@ protected:
     bool onBoard(const Vec2& vec);
     Vec2 getAxialFromGridPiece(const std::shared_ptr<Entity>& piece);
 
+    bool nextTurn = true;
     void movePiece(const Vec2& targetPosition, const std::shared_ptr<Entity>& piece);
 
-    void calculateMoveSet(const Vec2& pos, std::shared_ptr<Entity> piece);
+    void sUpdateMoveSets();
+
+    void calculateBidirectionalMoveSet(const Vec2& pos, CPiece& piece, Vec2 moveDirections[], int moveDirectionsSize, bool loop);
     void calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece);
     void calculateBishopMoveSet(const Vec2& pos, CPiece& cPiece);
     void calculateRookMoveSet(const Vec2& pos, CPiece& cPiece);
