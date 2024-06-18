@@ -147,7 +147,7 @@ void ScenePlay::onEnd()
 void ScenePlay::update()
 {
     m_entityManager.update();
-    std::cout << m_entityManager.totalEntities() << std::endl;
+    //std::cout << m_entityManager.totalEntities() << std::endl;
 
     if (m_paused)
     {
@@ -199,47 +199,155 @@ void ScenePlay::sDoAction(const Action& action)
     }
 }
 
-void ScenePlay::sMouseInput()
+Vec2 ScenePlay::mousePositionRelativeToWindowCenter()
 {
-    CPlayer& player = m_player->getComponent<CPlayer>();
     sf::Vector2i mousePosSF = sf::Mouse::getPosition(m_game->window());
     sf::Vector2 windowBounds = m_game->window().getSize();
 
-    Vec2 mousePos = Vec2(mousePosSF.x - windowBounds.x / 2.0, windowBounds.y - mousePosSF.y - windowBounds.y / 2.0);
+    return Vec2(mousePosSF.x - windowBounds.x / 2.0, windowBounds.y - mousePosSF.y - windowBounds.y / 2.0);
+}
+
+void ScenePlay::sMouseInput()
+{
+    CPlayer& player = m_player->getComponent<CPlayer>();
+    CPiece& selectedPieceComponent = player.selectedPiece->getComponent<CPiece>();
+
+    Vec2 mousePixelPos = mousePositionRelativeToWindowCenter();
+    sf::Vector2i mousePosSF = sf::Mouse::getPosition(m_game->window());
+
+    Vec2 mouseAxialPos = pixelToAxial(mousePixelPos);
+    Vec2 originalSelectedAxialPosition = getAxialFromGridPiece(player.selectedPiece);
+
+    bool isCurrentlyDragging = false;
+
+    std::shared_ptr<Entity> pieceOnClickedHex;
+
+    if (onBoard(mouseAxialPos))
+    {
+        pieceOnClickedHex = m_grid[mouseAxialPos];
+    }
+
+    if (player.selectedPiece)
+    {
+        //std::cout << "Player has selected piece!\n";
+        CTransform& playerPieceTransform = player.selectedPiece->getComponent<CTransform>();
+
+        if (playerPieceTransform.pos != axialToPixel(originalSelectedAxialPosition)) { isCurrentlyDragging = true ; }
+        else { isCurrentlyDragging = false ; }
+    }
+
+    /*
+    if (isCurrentlyDragging)
+    {
+        std::cout << "DRAGGING!\n";
+    }
+    */
+
 
     if (player.isCurrentlyClicked)
     {
-        if (!player.selectedPiece)
+        if (player.selectedPiece)
         {
-            Vec2 axialPos = pixelToAxial(mousePos);
-            std::cout << axialPos << std::endl;
-            std::cout << mousePos << std::endl;
-
-            if (onBoard(axialPos) && m_grid[axialPos])
+            if (isCurrentlyDragging)
             {
-                const CPiece& cPiece = m_grid[axialPos]->getComponent<CPiece>();
-                if (cPiece.color == whiteToMove)
+                // Drag piece
+                CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
+                pieceTransform.pos = Vec2(mousePosSF.x, mousePosSF.y);
+            }
+            //else if (mouseHexPos == hexPos in move/take array && not dragging)
+            else if (std::find(selectedPieceComponent.moveSet.begin(), selectedPieceComponent.moveSet.end(), mouseAxialPos) != selectedPieceComponent.moveSet.end() || std::find(selectedPieceComponent.takeSet.begin(), selectedPieceComponent.takeSet.end(), mouseAxialPos) != selectedPieceComponent.takeSet.end())
+            {
+                // Click and place piece
+
+                movePiece(mouseAxialPos, player.selectedPiece);
+
+                CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
+                pieceTransform.pos = axialToPixel(getAxialFromGridPiece(player.selectedPiece));
+
+                player.selectedPiece = nullptr;
+            }
+            //else if (mouseHexPos == hexPos of piece of same color && mouseHexPos != selectedPiecePos && not dragging)
+            else if (pieceOnClickedHex)
+            {
+                if (pieceOnClickedHex->getComponent<CPiece>().color == whiteToMove)
                 {
-                    player.selectedPiece = m_grid[axialPos];
-                    calculateMoveSet(axialPos, player.selectedPiece);
+                    Vec2 clickedPiecePosition = getAxialFromGridPiece(pieceOnClickedHex);
+
+                    if (clickedPiecePosition == originalSelectedAxialPosition)
+                    {
+                        CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
+                        pieceTransform.pos = Vec2(mousePosSF.x, mousePosSF.y);
+                        isCurrentlyDragging = true;
+                    }
+                    else
+                    {
+                        // Select another piece
+                        player.selectedPiece = pieceOnClickedHex;
+                        calculateMoveSet(clickedPiecePosition, pieceOnClickedHex);
+                    }
+                }
+                else
+                {
+                    // Deselect piece
+                    CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
+                    pieceTransform.pos = axialToPixel(originalSelectedAxialPosition);
+                    player.selectedPiece = nullptr;
                 }
             }
+            //else if (mouseHexPos != hexPos of ANY piece of same color)
+            //else if (mouseAxialPos)
+            else
+            {
+                // Deselect piece
+                CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
+                pieceTransform.pos = axialToPixel(originalSelectedAxialPosition);
+                player.selectedPiece = nullptr;
+            }
+
+
         }
         else
         {
-            CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
+            //if (mouseHexPos == hexPos of piece same color)
+            if (pieceOnClickedHex)
+            {
+                if (pieceOnClickedHex->getComponent<CPiece>().color == whiteToMove)
+                {
+                    // pick up piece -> cause dragging somehow
+                    CTransform& clickedPieceTransform = pieceOnClickedHex->getComponent<CTransform>();
+                    clickedPieceTransform.pos = Vec2(mousePosSF.x, mousePosSF.y);
+                    player.selectedPiece = pieceOnClickedHex;
 
-            pieceTransform.pos = Vec2(mousePosSF.x, mousePosSF.y);
+                    Vec2 clickedPiecePosition = getAxialFromGridPiece(pieceOnClickedHex);
+                    calculateMoveSet(clickedPiecePosition, pieceOnClickedHex);
+
+                    isCurrentlyDragging = true;
+                }
+            }
         }
     }
-    else if (player.selectedPiece)
+    else
     {
-        CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
-        pieceTransform.pos = axialToPixel(getAxialFromGridPiece(m_player->getComponent<CPlayer>().selectedPiece));
+        if (player.selectedPiece && isCurrentlyDragging)
+        {
+            // Drop the piece if mouse on move/take hex
+            if ((std::find(selectedPieceComponent.takeSet.begin(), selectedPieceComponent.takeSet.end(), mouseAxialPos) != selectedPieceComponent.takeSet.end()) || (std::find(selectedPieceComponent.moveSet.begin(), selectedPieceComponent.moveSet.end(), mouseAxialPos) != selectedPieceComponent.moveSet.end()))
+            {
+                movePiece(mouseAxialPos, player.selectedPiece);
 
-        movePiece(pixelToAxial(mousePos), player.selectedPiece);
+                CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
+                pieceTransform.pos = axialToPixel(getAxialFromGridPiece(player.selectedPiece));
 
-        player.selectedPiece = nullptr;
+                player.selectedPiece = nullptr;
+            }
+            else
+            {
+                CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
+                pieceTransform.pos = axialToPixel(originalSelectedAxialPosition);
+            }
+
+            //isCurrentlyDragging = false;
+        }
     }
 }
 
@@ -290,7 +398,7 @@ void ScenePlay::sRender()
 
         for (const std::shared_ptr<Entity>& entity : m_entityManager.getEntities("Piece"))
         {
-            if (entity != cPlayer.selectedPiece)
+            if (entity != cPlayer.selectedPiece || !cPlayer.isCurrentlyClicked)
             {
                 CTransform& transform = entity->getComponent<CTransform>();
 
@@ -339,16 +447,19 @@ void ScenePlay::sRender()
             }
 
             // DRAW PICKED UP PIECE
-            CTransform& transform = cPlayer.selectedPiece->getComponent<CTransform>();
+            if (cPlayer.isCurrentlyClicked)
+            {
+                CTransform& transform = cPlayer.selectedPiece->getComponent<CTransform>();
 
-            sf::Sprite& sprite = cPlayer.selectedPiece->getComponent<CSprite>().sprite;
+                sf::Sprite& sprite = cPlayer.selectedPiece->getComponent<CSprite>().sprite;
 
-            sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
-            sprite.setRotation(transform.angle);
-            sprite.setPosition(transform.pos.getX(), transform.pos.getY());
-            sprite.setScale(transform.scale.getX() * 1.5, transform.scale.getY() * 1.5);
+                sprite.setOrigin(sprite.getLocalBounds().width / 2, sprite.getLocalBounds().height / 2);
+                sprite.setRotation(transform.angle);
+                sprite.setPosition(transform.pos.getX(), transform.pos.getY());
+                sprite.setScale(transform.scale.getX() * 1.5, transform.scale.getY() * 1.5);
 
-            m_game->window().draw(sprite);
+                m_game->window().draw(sprite);
+            }
         }
     }
 
@@ -455,10 +566,24 @@ void ScenePlay::calculateMoveSet(const Vec2& pos, std::shared_ptr<Entity> piece)
     switch (cPiece.type)
     {
     case 1:
-        //calculateKingMoveSet(pos, cPiece):
+        calculateKingMoveSet(pos, cPiece);
         break;
     case 2:
         calculatePawnMoveSet(pos, cPiece);
+        break;
+    case 3:
+        calculateKnightMoveSet(pos, cPiece);
+        break;
+    case 4:
+        calculateBishopMoveSet(pos, cPiece);
+        break;
+    case 5:
+        calculateRookMoveSet(pos, cPiece);
+        break;
+    case 6:
+        calculateBishopMoveSet(pos, cPiece);
+        calculateRookMoveSet(pos, cPiece);
+        calculateLastQueenMoveSet(pos, cPiece);
         break;
     default:
         break;
@@ -471,12 +596,26 @@ void ScenePlay::calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece)
     {
         int color = (cPiece.color) ? 1 : -1 ;
 
+        Vec2 takes[2] = { Vec2(-1, 1) * color, Vec2(1, 0) * color };
+
+        for (Vec2& take : takes)
+        {
+            if (onBoard(pos + take) && m_grid[pos + take])
+            {
+                if (m_grid[pos + take]->getComponent<CPiece>().color == !cPiece.color)
+                {
+                    cPiece.takeSet.push_back(pos + take);
+                }
+            }
+        }
+
         Vec2 moves[2] = { Vec2(0, 1) * color, Vec2(0, 2) * color };
 
         if (onBoard(pos + moves[0]) && !m_grid[pos + moves[0]])
         {
             cPiece.moveSet.push_back(pos + moves[0]);
         }
+        else { return; }
 
         // If first pawn move and not entity in 2 squares up:
         if (onBoard(pos + moves[1]) && !m_grid[pos + moves[1]])
@@ -487,15 +626,146 @@ void ScenePlay::calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece)
             }
         }
 
-        Vec2 takes[2] = { Vec2(-1, 1) * color, Vec2(1, 0) * color };
+    }
+}
 
-        for (Vec2& take : takes)
+void ScenePlay::calculateBishopMoveSet(const Vec2& pos, CPiece& cPiece)
+{
+    Vec2 moves[4] = { Vec2(1, 1), Vec2(-1, 2), Vec2(-1, -1), Vec2(1, -2) };
+
+    for (int i = 0; i < 4; i++)
+    {
+        int distanceMultiplier = 1;
+
+        while (onBoard(pos + moves[i] * distanceMultiplier))
         {
-            if (onBoard(pos + take) && m_grid[pos + take])
+            std::shared_ptr<Entity> entityAtSearchedHex = m_grid[pos + moves[i] * distanceMultiplier];
+
+            if (!entityAtSearchedHex)
             {
-                if (m_grid[pos + take]->getComponent<CPiece>().color == !cPiece.color)
+                cPiece.moveSet.push_back(pos + moves[i] * distanceMultiplier);
+            }
+            else
+            {
+                if (!entityAtSearchedHex->getComponent<CPiece>().color == whiteToMove)
                 {
-                    cPiece.takeSet.push_back(pos + take);
+                    cPiece.takeSet.push_back(pos + moves[i] * distanceMultiplier);
+                }
+
+                break;
+            }
+
+            distanceMultiplier++;
+        }
+    }
+}
+
+void ScenePlay::calculateRookMoveSet(const Vec2& pos, CPiece& cPiece)
+{
+    Vec2 moves[6] = { Vec2(0, 1), Vec2(1, 0), Vec2(1, -1), Vec2(0, -1), Vec2(-1, 0), Vec2(-1, 1) };
+
+    for (int i = 0; i < 6; i++)
+    {
+        int distanceMultiplier = 1;
+
+        while (onBoard(pos + moves[i] * distanceMultiplier))
+        {
+            std::shared_ptr<Entity> entityAtSearchedHex = m_grid[pos + moves[i] * distanceMultiplier];
+
+            if (!entityAtSearchedHex)
+            {
+                cPiece.moveSet.push_back(pos + moves[i] * distanceMultiplier);
+            }
+            else
+            {
+                if (!entityAtSearchedHex->getComponent<CPiece>().color == whiteToMove)
+                {
+                    cPiece.takeSet.push_back(pos + moves[i] * distanceMultiplier);
+                }
+
+                break;
+            }
+
+            distanceMultiplier++;
+        }
+    }
+}
+
+void ScenePlay::calculateLastQueenMoveSet(const Vec2& pos, CPiece& cPiece)
+{
+    Vec2 moves[2] = { Vec2(-2, 1), Vec2(2, -1) };
+
+    for (int i = 0; i < 2; i++)
+    {
+        int distanceMultiplier = 1;
+
+        while (onBoard(pos + moves[i] * distanceMultiplier))
+        {
+            std::shared_ptr<Entity> entityAtSearchedHex = m_grid[pos + moves[i] * distanceMultiplier];
+
+            if (!entityAtSearchedHex)
+            {
+                cPiece.moveSet.push_back(pos + moves[i] * distanceMultiplier);
+            }
+            else
+            {
+                if (!entityAtSearchedHex->getComponent<CPiece>().color == whiteToMove)
+                {
+                    cPiece.takeSet.push_back(pos + moves[i] * distanceMultiplier);
+                }
+
+                break;
+            }
+
+            distanceMultiplier++;
+        }
+    }
+}
+
+void ScenePlay::calculateKnightMoveSet(const Vec2& pos, CPiece& cPiece)
+{
+    Vec2 moves[12] = { Vec2(1, 2), Vec2(2, 1), Vec2(3, -1), Vec2(3, -2), Vec2(2, -3), Vec2(1, -3), Vec2(-1, -2), Vec2(-2, -1), Vec2(-3, 1), Vec2(-3, 2), Vec2(-2, 3), Vec2(-1, 3) };
+
+    for (Vec2& move : moves)
+    {
+        if (onBoard(pos + move))
+        {
+            std::shared_ptr<Entity> entityAtSearchIndex = m_grid[pos + move];
+
+            if (!entityAtSearchIndex)
+            {
+                cPiece.moveSet.push_back(pos + move);
+            }
+            else
+            {
+                if (!entityAtSearchIndex->getComponent<CPiece>().color == whiteToMove)
+                {
+                    cPiece.takeSet.push_back(pos + move);
+                }
+            }
+        }
+    }
+}
+
+void ScenePlay::calculateKingMoveSet(const Vec2& pos, CPiece& cPiece)
+{
+    Vec2 moves[12] = { Vec2(0, 1), Vec2(1, 0), Vec2(1, -1), Vec2(0, -1), Vec2(-1, 0), Vec2(-1, 1), Vec2(-1, 2), Vec2(1, 1), Vec2(-2, 1), Vec2(2, -1), Vec2(-1, -1), Vec2(1, -2) };
+
+    for (Vec2& move : moves)
+    {
+        if (onBoard(pos + move))
+        {
+            std::shared_ptr<Entity> entityAtSearchIndex = m_grid[pos + move];
+
+            if (!entityAtSearchIndex)
+            {
+                cPiece.moveSet.push_back(pos + move);
+            }
+            else
+            {
+                if (!entityAtSearchIndex->getComponent<CPiece>().color == whiteToMove)
+                {
+                    cPiece.takeSet.push_back(pos + move);
                 }
             }
         }
