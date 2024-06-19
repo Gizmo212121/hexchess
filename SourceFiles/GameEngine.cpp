@@ -15,7 +15,7 @@ void GameEngine::init(const std::string& path)
 {
     m_assets.loadFromFile(path);
 
-    m_window.create(sf::VideoMode(1280, 768), "Platformer");
+    m_window.create(sf::VideoMode(1280, 768), "HexChess");
     m_window.setFramerateLimit(60);
 
     changeScene("MENU", std::make_shared<SceneMenu>(this));

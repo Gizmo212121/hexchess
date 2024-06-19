@@ -34,19 +34,26 @@ protected:
     bool m_drawGrid = false;
     sf::Text m_gridText;
 
+
     std::unordered_map<Vec2, std::shared_ptr<Entity>, Vec2Hash> m_grid;
+    std::unordered_map<Vec2, bool, Vec2Hash> m_prevGrid;
 
     std::shared_ptr<Entity> m_player;
+
 
     void init();
     void initializeAxialCoordinateGrid();
     void initializeTiles();
     void initializePieces();
 
+    void updatePreviousGrid();
+    std::vector<Vec2> compareGrids();
+
     float m_size = 121.0 / 3;
     Vec2 axialToPixel(const Vec2& vec);
     Vec2 pixelToAxial(const Vec2& vec);
     Vec2 mousePositionRelativeToWindowCenter();
+
 
     bool onBoard(const Vec2& vec);
     Vec2 getAxialFromGridPiece(const std::shared_ptr<Entity>& piece);
@@ -56,13 +63,13 @@ protected:
 
     void sUpdateMoveSets();
 
+
     void calculateBidirectionalMoveSet(const Vec2& pos, CPiece& piece, Vec2 moveDirections[], int moveDirectionsSize, bool loop);
     void calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece);
-    void calculateBishopMoveSet(const Vec2& pos, CPiece& cPiece);
-    void calculateRookMoveSet(const Vec2& pos, CPiece& cPiece);
-    void calculateLastQueenMoveSet(const Vec2& pos, CPiece& cPiece);
-    void calculateKnightMoveSet(const Vec2& pos, CPiece& cPiece);
-    void calculateKingMoveSet(const Vec2& pos, CPiece& cPiece);
+    Vec2 m_enPassantPosition;
+
+    template <typename type>
+    bool vectorHasObject(std::vector<type> container, type object) { return std::find(container.begin(), container.end(), object) != container.end(); }
 
 
     void onEnd() override;

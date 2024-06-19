@@ -148,6 +148,7 @@ void ScenePlay::update()
 {
     m_entityManager.update();
     //std::cout << m_entityManager.totalEntities() << std::endl;
+    //std::cout << "PREV GRID SIZE: " << m_prevGrid.size() << std::endl;;
 
     if (m_paused)
     {
@@ -159,17 +160,6 @@ void ScenePlay::update()
         sMouseInput();
         sRender();
     }
-
-    /*
-    for (const std::shared_ptr<Entity>& entity : m_entityManager.getEntities())
-    {
-        if (entity->tag() == "Player")
-        {
-            CTransform& playerTransform = entity->getComponent<CTransform>();
-            std::cout << playerTransform.pos << ", " << playerTransform.velocity << std::endl;
-        }
-    }
-    */
 
     m_currentFrame++;
 }
@@ -244,7 +234,6 @@ void ScenePlay::sMouseInput()
     }
     */
 
-
     if (player.isCurrentlyClicked)
     {
         if (player.selectedPiece)
@@ -256,7 +245,7 @@ void ScenePlay::sMouseInput()
                 pieceTransform.pos = Vec2(mousePosSF.x, mousePosSF.y);
             }
             //else if (mouseHexPos == hexPos in move/take array && not dragging)
-            else if (std::find(selectedPieceComponent.moveSet.begin(), selectedPieceComponent.moveSet.end(), mouseAxialPos) != selectedPieceComponent.moveSet.end() || std::find(selectedPieceComponent.takeSet.begin(), selectedPieceComponent.takeSet.end(), mouseAxialPos) != selectedPieceComponent.takeSet.end())
+            else if (vectorHasObject(selectedPieceComponent.moveSet, mouseAxialPos) || vectorHasObject(selectedPieceComponent.takeSet, mouseAxialPos))
             {
                 // Click and place piece
 
@@ -317,10 +306,6 @@ void ScenePlay::sMouseInput()
                     CTransform& clickedPieceTransform = pieceOnClickedHex->getComponent<CTransform>();
                     clickedPieceTransform.pos = Vec2(mousePosSF.x, mousePosSF.y);
                     player.selectedPiece = pieceOnClickedHex;
-
-                    Vec2 clickedPiecePosition = getAxialFromGridPiece(pieceOnClickedHex);
-
-                    isCurrentlyDragging = true;
                 }
             }
         }
@@ -330,7 +315,7 @@ void ScenePlay::sMouseInput()
         if (player.selectedPiece && isCurrentlyDragging)
         {
             // Drop the piece if mouse on move/take hex
-            if ((std::find(selectedPieceComponent.takeSet.begin(), selectedPieceComponent.takeSet.end(), mouseAxialPos) != selectedPieceComponent.takeSet.end()) || (std::find(selectedPieceComponent.moveSet.begin(), selectedPieceComponent.moveSet.end(), mouseAxialPos) != selectedPieceComponent.moveSet.end()))
+            if (vectorHasObject(selectedPieceComponent.takeSet, mouseAxialPos) || vectorHasObject(selectedPieceComponent.moveSet, mouseAxialPos))
             {
                 movePiece(mouseAxialPos, player.selectedPiece);
 
@@ -344,8 +329,6 @@ void ScenePlay::sMouseInput()
                 CTransform& pieceTransform = player.selectedPiece->getComponent<CTransform>();
                 pieceTransform.pos = axialToPixel(originalSelectedAxialPosition);
             }
-
-            //isCurrentlyDragging = false;
         }
     }
 }
@@ -425,21 +408,21 @@ void ScenePlay::sRender()
 
                 circle.setPosition(axialPos.getX(), axialPos.getY());
                 circle.setOrigin(circle.getRadius(), circle.getRadius());
-                circle.setFillColor(sf::Color(114, 121, 143, 150));
+                circle.setFillColor(sf::Color(145, 153, 227));
 
                 m_game->window().draw(circle);
             }
 
             for (const Vec2& vec : cPiece.takeSet)
             {
-                sf::CircleShape circle(25, 30);
+                sf::CircleShape circle(30, 30);
 
                 Vec2 axialPos = axialToPixel(vec);
 
                 circle.setPosition(axialPos.getX(), axialPos.getY());
                 circle.setOrigin(circle.getRadius(), circle.getRadius());
                 circle.setFillColor(sf::Color(0, 0, 0, 0));
-                circle.setOutlineColor(sf::Color(114, 121, 143, 150));
+                circle.setOutlineColor(sf::Color(145, 153, 227));
                 circle.setOutlineThickness(4);
 
                 m_game->window().draw(circle);
@@ -519,6 +502,8 @@ Vec2 ScenePlay::getAxialFromGridPiece(const std::shared_ptr<Entity>& piece)
 
 void ScenePlay::movePiece(const Vec2& targetPosition, const std::shared_ptr<Entity>& piece)
 {
+    m_enPassantPosition = Vec2(100, 100);
+
     if (!onBoard(targetPosition)) { return ; }
 
     Vec2 originalPosition = getAxialFromGridPiece(piece);
@@ -526,10 +511,12 @@ void ScenePlay::movePiece(const Vec2& targetPosition, const std::shared_ptr<Enti
 
     if (originalPosition != targetPosition)
     {
+        updatePreviousGrid();
+
         // IF TARGET POSITION IN MOVESET
         if (m_grid[targetPosition])
         {
-            if (std::find(cPiece.takeSet.begin(), cPiece.takeSet.end(), targetPosition) != cPiece.takeSet.end())
+            if (vectorHasObject(cPiece.takeSet, targetPosition))
             {
                 m_grid[targetPosition]->destroy();
                 m_grid[targetPosition] = piece;
@@ -544,11 +531,34 @@ void ScenePlay::movePiece(const Vec2& targetPosition, const std::shared_ptr<Enti
         }
         else
         {
-            if (std::find(cPiece.moveSet.begin(), cPiece.moveSet.end(), targetPosition) != cPiece.moveSet.end())
+            int color = (cPiece.color) ? -1 : 1 ;
+
+            if (vectorHasObject(cPiece.moveSet, targetPosition))
             {
+                if (cPiece.type == 2 && roundf(fabs(targetPosition.getY() - originalPosition.getY())) == 2)
+                {
+                    m_enPassantPosition = targetPosition + Vec2(0, 1) * color;
+                }
+
                 CTransform& pieceTransform = piece->getComponent<CTransform>();
                 pieceTransform.pos = axialToPixel(targetPosition);
                 m_grid[targetPosition] = piece;
+                m_grid[originalPosition] = nullptr;
+
+                whiteToMove = !whiteToMove;
+                nextTurn = true;
+            }
+            else if (vectorHasObject(cPiece.takeSet, targetPosition))
+            {
+                Vec2 endingLocation(targetPosition + Vec2(0, 1) * color);
+
+                CTransform& pieceTransform = piece->getComponent<CTransform>();
+                pieceTransform.pos = axialToPixel(targetPosition);
+                m_grid[targetPosition] = piece;
+
+                m_grid[endingLocation]->destroy();
+                m_grid[endingLocation] = nullptr;
+
                 m_grid[originalPosition] = nullptr;
 
                 whiteToMove = !whiteToMove;
@@ -615,15 +625,24 @@ void ScenePlay::sUpdateMoveSets()
 
 void ScenePlay::calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece)
 {
+    std::vector<Vec2> changedPositions = compareGrids();
+
     int color = (cPiece.color) ? 1 : -1 ;
 
     Vec2 takes[2] = { Vec2(-1, 1) * color, Vec2(1, 0) * color };
 
     for (Vec2& take : takes)
     {
-        if (onBoard(pos + take) && m_grid[pos + take])
+        if (onBoard(pos + take))
         {
-            if (m_grid[pos + take]->getComponent<CPiece>().color == !cPiece.color)
+            if (m_grid[pos + take])
+            {
+                if (m_grid[pos + take]->getComponent<CPiece>().color == !cPiece.color)
+                {
+                    cPiece.takeSet.push_back(pos + take);
+                }
+            }
+            else if (pos + take == m_enPassantPosition)
             {
                 cPiece.takeSet.push_back(pos + take);
             }
@@ -677,4 +696,28 @@ void ScenePlay::calculateBidirectionalMoveSet(const Vec2& pos, CPiece& piece, Ve
             distanceMultiplier++;
         }
     }
+}
+
+void ScenePlay::updatePreviousGrid()
+{
+    for (auto& it : m_grid)
+    {
+        if (it.second) { m_prevGrid[it.first] = 1; }
+        else { m_prevGrid[it.first] = 0 ; }
+    }
+}
+
+std::vector<Vec2> ScenePlay::compareGrids()
+{
+    std::vector<Vec2> positions;
+
+    for (auto& it : m_grid)
+    {
+        if (!(it.second && m_prevGrid[it.first]))
+        {
+            positions.push_back(it.first);
+        }
+    }
+
+    return positions;
 }
