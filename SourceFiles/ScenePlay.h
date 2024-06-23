@@ -63,10 +63,15 @@ protected:
 
     void sUpdateMoveSets();
 
-
     void calculateBidirectionalMoveSet(const Vec2& pos, CPiece& piece, Vec2 moveDirections[], int moveDirectionsSize, bool loop);
     void calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece);
     Vec2 m_enPassantPosition;
+
+    Vec2 whiteKingPos = Vec2(1, -5);
+    Vec2 blackKingPos = Vec2(1,  4);
+    bool isInCheck = false;
+    std::vector<Vec2> m_pinnedPieces;
+    void sCalculateCheck();
 
     template <typename type>
     bool vectorHasObject(std::vector<type> container, type object) { return std::find(container.begin(), container.end(), object) != container.end(); }

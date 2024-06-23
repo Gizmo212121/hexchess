@@ -150,16 +150,27 @@ void ScenePlay::update()
     //std::cout << m_entityManager.totalEntities() << std::endl;
     //std::cout << "PREV GRID SIZE: " << m_prevGrid.size() << std::endl;;
 
+    
+    /*
+    for (size_t i = 0; i < m_pinnedPieces.size(); i++)
+    {
+        std::cout << m_pinnedPieces[i] << std::endl;
+    }
+    */
+
     if (m_paused)
     {
         sRender();
     }
     else
     {
+        sCalculateCheck();
         sUpdateMoveSets();
         sMouseInput();
         sRender();
     }
+
+    if (isInCheck) { std::cout << "IN CHECK!\n" ; }
 
     m_currentFrame++;
 }
@@ -522,6 +533,12 @@ void ScenePlay::movePiece(const Vec2& targetPosition, const std::shared_ptr<Enti
                 m_grid[targetPosition] = piece;
                 m_grid[originalPosition] = nullptr;
 
+                if (cPiece.type == 1)
+                {
+                    if (whiteToMove) { whiteKingPos = targetPosition ; }
+                    else { blackKingPos = targetPosition ; }
+                }
+
                 CTransform& pieceTransform = piece->getComponent<CTransform>();
                 pieceTransform.pos = axialToPixel(targetPosition);
 
@@ -538,6 +555,11 @@ void ScenePlay::movePiece(const Vec2& targetPosition, const std::shared_ptr<Enti
                 if (cPiece.type == 2 && roundf(fabs(targetPosition.getY() - originalPosition.getY())) == 2)
                 {
                     m_enPassantPosition = targetPosition + Vec2(0, 1) * color;
+                }
+                else if (cPiece.type == 1)
+                {
+                    if (whiteToMove) { whiteKingPos = targetPosition ; }
+                    else { blackKingPos = targetPosition ; }
                 }
 
                 CTransform& pieceTransform = piece->getComponent<CTransform>();
@@ -625,6 +647,17 @@ void ScenePlay::sUpdateMoveSets()
 
 void ScenePlay::calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece)
 {
+    bool pinned = vectorHasObject(m_pinnedPieces, pos);
+    Vec2 pinDirection(100, 100);
+
+    if (pinned)
+    {
+        Vec2 kingPos = (whiteToMove) ? whiteKingPos : blackKingPos;
+        Vec2 differenceVector = pos - kingPos;
+        pinDirection = differenceVector / std::max(fabs(differenceVector.getX()), fabs(differenceVector.getY()));
+        std::cout << "PIN DIRECTION: " << pinDirection << std::endl;
+    }
+
     std::vector<Vec2> changedPositions = compareGrids();
 
     int color = (cPiece.color) ? 1 : -1 ;
@@ -633,6 +666,8 @@ void ScenePlay::calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece)
 
     for (Vec2& take : takes)
     {
+        if (pinned && take != pinDirection) { continue; }
+
         if (onBoard(pos + take))
         {
             if (m_grid[pos + take])
@@ -651,26 +686,42 @@ void ScenePlay::calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece)
 
     Vec2 moves[2] = { Vec2(0, 1) * color, Vec2(0, 2) * color };
 
-    if (onBoard(pos + moves[0]) && !m_grid[pos + moves[0]])
+    if (!pinned || moves[0] == pinDirection)
     {
-        cPiece.moveSet.push_back(pos + moves[0]);
-    }
-    else { return; }
-
-    // If first pawn move and not entity in 2 squares up:
-    if (onBoard(pos + moves[1]) && !m_grid[pos + moves[1]])
-    {
-        if ((pos.getX() + pos.getY() == -1 * color && pos.getY() * color <= -1) || (pos.getX() * color <= -1 && pos.getY() == -1 * color))
+        if (onBoard(pos + moves[0]) && !m_grid[pos + moves[0]])
         {
-            cPiece.moveSet.push_back(pos + moves[1]);
+            cPiece.moveSet.push_back(pos + moves[0]);
+        }
+        else { return; }
+
+        // If first pawn move and not entity in 2 squares up:
+        if (onBoard(pos + moves[1]) && !m_grid[pos + moves[1]])
+        {
+            if ((pos.getX() + pos.getY() == -1 * color && pos.getY() * color <= -1) || (pos.getX() * color <= -1 && pos.getY() == -1 * color))
+            {
+                cPiece.moveSet.push_back(pos + moves[1]);
+            }
         }
     }
 }
 
 void ScenePlay::calculateBidirectionalMoveSet(const Vec2& pos, CPiece& piece, Vec2 moveDirections[], int moveDirectionsSize, bool loop)
 {
+    bool pinned = vectorHasObject(m_pinnedPieces, pos);
+    Vec2 pinDirection(100, 100);
+
+    if (pinned)
+    {
+        Vec2 kingPos = (whiteToMove) ? whiteKingPos : blackKingPos;
+        Vec2 differenceVector = pos - kingPos;
+        pinDirection = differenceVector / std::max(fabs(differenceVector.getX()), fabs(differenceVector.getY()));
+        std::cout << "PIN DIRECTION: " << pinDirection << std::endl;
+    }
+
     for (int i = 0; i < moveDirectionsSize; i++)
     {
+        if (pinned && moveDirections[i] != pinDirection) { continue; }
+
         int distanceMultiplier = 1;
 
         while (onBoard(pos + moveDirections[i] * distanceMultiplier))
@@ -720,4 +771,166 @@ std::vector<Vec2> ScenePlay::compareGrids()
     }
 
     return positions;
+}
+
+void ScenePlay::sCalculateCheck()
+{
+    if (!nextTurn) { return ; }
+
+    isInCheck = false;
+
+    m_pinnedPieces.clear();
+
+    Vec2 kingPosition;
+
+    if (whiteToMove) { kingPosition = whiteKingPos ; }
+    else { kingPosition = blackKingPos ; }
+
+
+    for (const Vec2& direction : m_adjacentPositions)
+    {
+        int directionMultiplier = 1;
+
+        bool foundOwnedPiece = false;
+        Vec2 ownedPiecePosition;
+
+        while (onBoard(kingPosition + direction * directionMultiplier))
+        {
+            Vec2 hexToCheck = kingPosition + direction * directionMultiplier;
+
+            directionMultiplier++;
+
+            if (m_grid[hexToCheck])
+            {
+                const CPiece& pieceAtHex = m_grid[hexToCheck]->getComponent<CPiece>();
+
+                if (pieceAtHex.color == whiteToMove)
+                {
+                    if (foundOwnedPiece) { break; }
+
+                    foundOwnedPiece = true;
+                    ownedPiecePosition = hexToCheck;
+                }
+                else
+                {
+                    if (pieceAtHex.type == 5 || pieceAtHex.type == 6)
+                    {
+                        if (foundOwnedPiece)
+                        {
+                            m_pinnedPieces.push_back(ownedPiecePosition);
+                            break;
+                        }
+                        else
+                        {
+                            isInCheck = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (const Vec2& direction : m_bishopDiagonalPositions)
+    {
+        int directionMultiplier = 1;
+
+        bool foundOwnedPiece = false;
+        Vec2 ownedPiecePosition;
+
+        while (onBoard(kingPosition + direction * directionMultiplier))
+        {
+            Vec2 hexToCheck = kingPosition + direction * directionMultiplier;
+
+            directionMultiplier++;
+
+            if (m_grid[hexToCheck])
+            {
+                const CPiece& pieceAtHex = m_grid[hexToCheck]->getComponent<CPiece>();
+
+                if (pieceAtHex.color == whiteToMove)
+                {
+                    if (foundOwnedPiece) { break; }
+                    foundOwnedPiece = true;
+                    ownedPiecePosition = hexToCheck;
+                }
+                else
+                {
+                    if (pieceAtHex.type == 4 || pieceAtHex.type == 6)
+                    {
+                        if (foundOwnedPiece)
+                        {
+                            m_pinnedPieces.push_back(ownedPiecePosition);
+                            break;
+                        }
+                        else
+                        {
+                            isInCheck = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (const Vec2& direction : m_queenDiagonalPositions)
+    {
+        int directionMultiplier = 1;
+
+        bool foundOwnedPiece = false;
+        Vec2 ownedPiecePosition;
+
+        while (onBoard(kingPosition + direction * directionMultiplier))
+        {
+            Vec2 hexToCheck = kingPosition + direction * directionMultiplier;
+
+            directionMultiplier++;
+
+            if (m_grid[hexToCheck])
+            {
+                const CPiece& pieceAtHex = m_grid[hexToCheck]->getComponent<CPiece>();
+
+                if (pieceAtHex.color == whiteToMove)
+                {
+                    if (foundOwnedPiece) { break; }
+                    foundOwnedPiece = true;
+                    ownedPiecePosition = hexToCheck;
+                }
+                else
+                {
+                    if (pieceAtHex.type == 6)
+                    {
+                        if (foundOwnedPiece)
+                        {
+                            m_pinnedPieces.push_back(ownedPiecePosition);
+                            break;
+                        }
+                        else
+                        {
+                            isInCheck = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (const Vec2& direction : m_knightMovePositions)
+    {
+        if (onBoard(kingPosition + direction))
+        {
+            if (m_grid[kingPosition + direction])
+            {
+                const CPiece& pieceAtHex = m_grid[kingPosition + direction]->getComponent<CPiece>();
+
+                if (pieceAtHex.color == !whiteToMove && pieceAtHex.type == 3)
+                {
+                    isInCheck = true;
+                    return;
+                }
+            }
+        }
+    }
 }
