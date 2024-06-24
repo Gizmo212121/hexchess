@@ -45,6 +45,7 @@ protected:
     void initializeAxialCoordinateGrid();
     void initializeTiles();
     void initializePieces();
+    void initializeTestPieces();
 
     void updatePreviousGrid();
     std::vector<Vec2> compareGrids();
@@ -63,15 +64,22 @@ protected:
 
     void sUpdateMoveSets();
 
-    void calculateBidirectionalMoveSet(const Vec2& pos, CPiece& piece, Vec2 moveDirections[], int moveDirectionsSize, bool loop);
-    void calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece);
+    void calculateBidirectionalMoveSet(const Vec2& pos, CPiece& piece, Vec2 moveDirections[], int moveDirectionsSize, bool loop, bool inCheck);
+    void calculatePawnMoveSet(const Vec2& pos, CPiece& cPiece, bool inCheck);
     Vec2 m_enPassantPosition;
+
+    bool isPromotionSquare(const Vec2& pos);
 
     Vec2 whiteKingPos = Vec2(1, -5);
     Vec2 blackKingPos = Vec2(1,  4);
     bool isInCheck = false;
     std::vector<Vec2> m_pinnedPieces;
     void sCalculateCheck();
+    bool calculateCheckOnKingMove(const Vec2& targetPosition);
+
+    void sCalculateCheckmateStalemate();
+
+    void sMakeRandomMove();
 
     template <typename type>
     bool vectorHasObject(std::vector<type> container, type object) { return std::find(container.begin(), container.end(), object) != container.end(); }

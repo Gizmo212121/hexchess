@@ -8,5 +8,14 @@ TODO LIST:
 - [ x ] En passant
 - [ x ] Flesh out player-holding mechanism
 - [ x ] Refactor moveset-updating
-- [ ] Check & checkmate
+- [ x? ] Check & checkmate
+    - [ x ] Prevent own pieces from putting the king in check (pins)
+    - [ x ] Prevent the king from moving into a check
+    - [ x ] Only allow check-saving moves when in check (necessity to get out of check)
+    - [ x ] Checkmate when no moves possible
+    - [ ] RIGOROUSLY CHECK AS MANY CASES AS POSSIBLE
+- [ ] Stalemate when certain boards are met (ex: two kings is always stalemate)
+- [ x? ] Pawn promotions
+    - [ ] Maybe add player choice for pawn-promotion
 - [ ] Menu & UI
+- [ ] Fix window-resizing problems
