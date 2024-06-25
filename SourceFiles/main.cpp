@@ -2,11 +2,7 @@
 
 int main()
 {
-    std::string assets = "ResourceFiles/Assets.txt";
+    std::string assetConfigPath = "ResourceFiles/Assets.txt";
 
-    GameEngine game(assets);
-
-    game.run();
-
-    return 0;
+    GameEngine game(assetConfigPath);
 }

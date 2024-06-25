@@ -1,10 +1,9 @@
 #include "GameEngine.h"
-#include "SceneMenu.h"
+#include "ScenePlay.h"
 
-
-#include <SFML/Window/Keyboard.hpp>
-#include <iostream>
 #include <memory>
+
+GameEngine::GameEngine() {}
 
 GameEngine::GameEngine(const std::string& path)
 {
@@ -15,10 +14,9 @@ void GameEngine::init(const std::string& path)
 {
     m_assets.loadFromFile(path);
 
-    m_window.create(sf::VideoMode(1280, 768), "HexChess");
-    m_window.setFramerateLimit(60);
+    m_window.create(sf::VideoMode(1280, 768), "HexChessMK2");
 
-    changeScene("MENU", std::make_shared<SceneMenu>(this));
+    changeScene("Game", std::make_shared<ScenePlay>(this));
 }
 
 std::shared_ptr<Scene> GameEngine::currentScene()
@@ -42,11 +40,6 @@ void GameEngine::run()
     {
         update();
     }
-}
-
-void GameEngine::quit()
-{
-    m_running = false;
 }
 
 void GameEngine::sUserInput()
@@ -83,9 +76,9 @@ void GameEngine::sUserInput()
                 continue;
             }
 
-            const std::string actionType = (event.type == sf::Event::KeyPressed) ? "START" : "END" ;
+            bool pressed = (sf::Event::KeyPressed) ? 1 : 0 ;
 
-            currentScene()->doAction(Action(currentScene()->getActionMap().at(event.key.code), actionType));
+            currentScene()->doAction(Action(pressed, currentScene()->getActionMap().at(event.key.code)));
         }
         else if (event.type == sf::Event::MouseButtonPressed || event.type == sf::Event::MouseButtonReleased)
         {
@@ -94,15 +87,9 @@ void GameEngine::sUserInput()
                 continue;
             }
 
-            const std::string actionType = (event.type == sf::Event::MouseButtonPressed) ? "START" : "END" ;
+            bool pressed = (sf::Event::MouseButtonPressed) ? 1 : 0 ;
 
-            currentScene()->doAction(Action(currentScene()->getActionMap().at(event.key.code + 1000), actionType));
+            currentScene()->doAction(Action(pressed, currentScene()->getActionMap().at(event.key.code + 1000)));
         }
     }
-}
-
-void GameEngine::update()
-{
-    currentScene()->update();
-    sUserInput();
 }

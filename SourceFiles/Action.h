@@ -1,21 +1,25 @@
 #pragma once
 
-#include <sstream>
+#include <string>
+#include <iostream>
 
 class Action
 {
+
 private:
 
-    std::string m_name = "default";
-    std::string m_type = "default";
+    bool m_state;
+    std::string m_name;
 
 public:
 
+    enum { END = 0, START = 1 };
+
     Action() {}
 
-    Action(const std::string& name, const std::string& type)
-        : m_name(name), m_type(type) {}
+    Action(const bool state, const std::string& name)
+        : m_state(state), m_name(name) {}
 
+    bool state() const { return m_state ; }
     const std::string& name() const { return m_name ; }
-    const std::string& type() const { return m_type ; }
 };

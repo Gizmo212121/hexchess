@@ -1,8 +1,11 @@
 #include "Assets.h"
-#include <fstream>
-#include <memory>
 
-void Assets::addTexture(std::string& name, std::string& path)
+Assets::Assets() { }
+
+Assets::Assets(const TextureMap& textureMap, const SoundMap& soundMap, const SoundBufferMap& soundBufferMap, const FontMap& fontMap)
+    : m_textures(textureMap), m_sounds(soundMap), m_soundBuffers(soundBufferMap), m_fonts(fontMap) {}
+
+void Assets::addTexture(const std::string& name, const std::string& path)
 {
     sf::Texture texture;
 
@@ -10,44 +13,39 @@ void Assets::addTexture(std::string& name, std::string& path)
 
     if (!texture.loadFromFile(path))
     {
-        std::cout << "Texture at path " << path << " failed to load!\n";
+        std::cerr << "Could not load texture " << name << " from path " << path << std::endl;
         exit(1);
-    }
-    else
-    {
-        std::cout << "Texture at path " << path << " loaded successfully!\n";
     }
 
     m_textures[name] = std::make_shared<sf::Texture>(texture);
 }
 
-
-void Assets::addSound(std::string& name, std::string& path)
+void Assets::addSound(const std::string& name, const std::string& path)
 {
     sf::SoundBuffer buffer;
 
-    sf::Sound sound;
-
     if (!buffer.loadFromFile(path))
     {
-        std::cout << "Audio file at path " << path << " failed to load!\n";
+        std::cerr << "Could not load sound " << name << " from path " << path << std::endl;
         exit(1);
     }
 
-    sound.setBuffer(buffer);
+    m_soundBuffers[name] = buffer;
+
+    sf::Sound sound;
+
+    sound.setBuffer(m_soundBuffers[name]);
 
     m_sounds[name] = sound;
 }
 
-void Assets::addFont(std::string& name, std::string& path)
+void Assets::addFont(const std::string& name, const std::string& path)
 {
-    std::cout << "Adding font!\n";
     sf::Font font;
 
     if (!font.loadFromFile(path))
     {
-        std::cout << "Font at path " << path << " failed to load!\n";
-        std::cout << "IDIO";
+        std::cerr << "Could not load font " << name << " from path " << path << std::endl;
         exit(1);
     }
 
@@ -56,9 +54,7 @@ void Assets::addFont(std::string& name, std::string& path)
 
 void Assets::loadFromFile(const std::string& path)
 {
-    std::cout << "Loading assets\n";
-
-    std::ifstream fin;
+    std::fstream fin;
 
     fin.open(path);
 
@@ -68,58 +64,89 @@ void Assets::loadFromFile(const std::string& path)
     {
         if (assetType == "Texture")
         {
-            std::string name, path;
+            std::string name, assetPath;
 
-            fin >> name >> path;
+            fin >> name >> assetPath;
 
-            addTexture(name, path);
+            addTexture(name, assetPath);
         }
         else if (assetType == "Sound")
         {
-            std::cout << "Sound asset not implemented\n";
+            std::string name, assetPath;
+
+            fin >> name >> assetPath;
+
+            addSound(name, assetPath);
         }
         else if (assetType == "Font")
         {
-            std::string name, path;
+            std::string name, assetPath;
 
-            fin >> name >> path;
+            fin >> name >> assetPath;
 
-            addFont(name, path);
+            addFont(name, assetPath);
         }
     }
 
     fin.close();
 }
 
-const std::shared_ptr<sf::Texture> Assets::getTexture(const std::string& name) const
+const sf::Texture& Assets::getTexure(const std::string& name) const
 {
-    auto it = m_textures.find(name);
-    if (it == m_textures.end())
+    const auto& it = m_textures.find(name);
+
+    if (it != m_textures.end())
     {
-        std::cerr << "Error: Texture " << name << " not found!" << std::endl;
+        return *it->second;
+    }
+    else
+    {
+        std::cerr << "Could not retrieve texture: " << name << std::endl;
         exit(1);
     }
-    return it->second;
+}
+
+const sf::SoundBuffer& Assets::getSoundBuffer(const std::string& name) const
+{
+    const auto& it = m_soundBuffers.find(name);
+
+    if (it != m_soundBuffers.end())
+    {
+        return it->second;
+    }
+    else
+    {
+        std::cerr << "Could not retrieve sound buffer: " << name << std::endl;
+        exit(1);
+    }
 }
 
 const sf::Sound& Assets::getSound(const std::string& name) const
 {
-    auto it = m_sounds.find(name);
-    if (it == m_sounds.end())
+    const auto& it = m_sounds.find(name);
+
+    if (it != m_sounds.end())
     {
-        std::cerr << "Error: Sound " << name << " not found!" << std::endl;
+        return it->second;
+    }
+    else
+    {
+        std::cerr << "Could not retrieve sound: " << name << std::endl;
         exit(1);
     }
-    return it->second;
 }
 
 const sf::Font& Assets::getFont(const std::string& name) const
 {
-    auto it = m_fonts.find(name);
-    if (it == m_fonts.end())
+    const auto& it = m_fonts.find(name);
+
+    if (it != m_fonts.end())
     {
-        std::cerr << "Error: Font " << name << " not found!" << std::endl;
+        return it->second;
+    }
+    else
+    {
+        std::cerr << "Could not retrieve font: " << name << std::endl;
         exit(1);
     }
-    return it->second;
 }
