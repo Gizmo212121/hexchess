@@ -5,4 +5,6 @@ int main()
     std::string assetConfigPath = "ResourceFiles/Assets.txt";
 
     GameEngine game(assetConfigPath);
+
+    game.run();
 }

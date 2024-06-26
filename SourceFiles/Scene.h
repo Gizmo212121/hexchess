@@ -17,9 +17,9 @@ protected:
 
     bool m_paused = false;
 
-
-    virtual void onEnd();
-    void setPaused(bool paused) { m_paused = paused ; }
+    virtual void onEnd() = 0;
+    void setPaused() { m_paused = true ; }
+    void setUnpaused() { m_paused = false; }
 
 public:
 

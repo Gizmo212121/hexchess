@@ -42,6 +42,12 @@ void GameEngine::run()
     }
 }
 
+void GameEngine::update()
+{
+    sUserInput();
+    currentScene()->update();
+}
+
 void GameEngine::sUserInput()
 {
     sf::Event event;
@@ -76,7 +82,7 @@ void GameEngine::sUserInput()
                 continue;
             }
 
-            bool pressed = (sf::Event::KeyPressed) ? 1 : 0 ;
+            bool pressed = (event.type == sf::Event::KeyPressed) ? 1 : 0 ;
 
             currentScene()->doAction(Action(pressed, currentScene()->getActionMap().at(event.key.code)));
         }
@@ -87,7 +93,7 @@ void GameEngine::sUserInput()
                 continue;
             }
 
-            bool pressed = (sf::Event::MouseButtonPressed) ? 1 : 0 ;
+            bool pressed = (event.type == sf::Event::MouseButtonPressed) ? 1 : 0 ;
 
             currentScene()->doAction(Action(pressed, currentScene()->getActionMap().at(event.key.code + 1000)));
         }

@@ -1,14 +1,20 @@
 #include "Scene.h"
 #include "GameEngine.h"
 
-Scene::Scene() {}
+Scene::Scene()
+{
+
+}
 
 Scene::Scene(GameEngine* gameEngine)
-    : m_game(gameEngine) {}
+    : m_game(gameEngine)
+{
+
+}
 
 void Scene::doAction(const Action& action)
 {
-    std::string type = (action.state()) ? "Press" : "Release";
+    std::string type = (action.state()) ? "Pressed " : "Released ";
     std::cout << "Action: " << type << action.name() << std::endl;
 
     sDoAction(action);
