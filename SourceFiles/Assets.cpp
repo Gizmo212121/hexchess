@@ -91,7 +91,7 @@ void Assets::loadFromFile(const std::string& path)
     fin.close();
 }
 
-const sf::Texture& Assets::getTexure(const std::string& name) const
+const sf::Texture& Assets::getTexture(const std::string& name) const
 {
     const auto& it = m_textures.find(name);
 

@@ -33,7 +33,7 @@ public:
 
     void loadFromFile(const std::string& path);
 
-    const sf::Texture& getTexure(const std::string& name) const;
+    const sf::Texture& getTexture(const std::string& name) const;
     const sf::SoundBuffer& getSoundBuffer(const std::string& name) const;
     const sf::Sound& getSound(const std::string& name) const;
     const sf::Font& getFont(const std::string& name) const;

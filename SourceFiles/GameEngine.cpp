@@ -15,6 +15,8 @@ void GameEngine::init(const std::string& path)
     m_assets.loadFromFile(path);
 
     m_window.create(sf::VideoMode(1280, 768), "HexChessMK2");
+    m_window.setVerticalSyncEnabled(true);
+    //m_window.setFramerateLimit(10);
 
     changeScene("Game", std::make_shared<ScenePlay>(this));
 }
@@ -38,6 +40,7 @@ void GameEngine::run()
 {
     while (isRunning())
     {
+        //sf::sleep(sf::milliseconds(1699));
         update();
     }
 }
