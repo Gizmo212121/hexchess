@@ -8,6 +8,7 @@ ChessEngine::ChessEngine()
 void ChessEngine::init()
 {
     initializeGlinskiBoard();
+    initializeDistanceToEndGrid();
 }
 
 void ChessEngine::initializeGlinskiBoard()
@@ -49,4 +50,112 @@ void ChessEngine::movePiece(size_t startIndex, size_t targetIndex)
     }
 
     m_whiteToMove = !m_whiteToMove;
+}
+
+void ChessEngine::initializeDistanceToEndGrid()
+{
+    int directions[12] = {
+        North, South, NorthEast, SouthEast, NorthWest, SouthWest,
+        EastDiagonal, WestDiagonal, NorthWestDiagonal, NorthEastDiagonal, SouthWestDiagonal, SouthEastDiagonal
+    };
+
+    for (int i = 0; i < GRID_HEX_COUNT; i++)
+    {
+        if (m_grid[i] == Null) { continue ; }
+
+        int initialRow = i / GRID_LENGTH;
+
+        for (int j = 0; j < 12; j++)
+        {
+            if (i + directions[j] < 0 || i + directions[j] >= GRID_HEX_COUNT) { m_distanceToEndGrid[i][j] = 0 ; continue ; }
+
+            int directionMultiplier = 1;
+
+            while (i + directions[j] * directionMultiplier >= 0 && i + directions[j] * directionMultiplier < GRID_HEX_COUNT)
+            {
+                if (m_grid[i + directions[j] * directionMultiplier] == Null) { break; }
+
+                int currentRow = (i + directions[j] * directionMultiplier) / GRID_LENGTH;
+                int distanceBetweenCurrentAndLastRow = abs(currentRow - initialRow);
+
+                if (directions[j] == SouthWest || directions[j] == NorthEast)
+                {
+                    if (currentRow != initialRow) { break; }
+                }
+                else if (directions[j] == South || directions[j] == North)
+                {
+                    if (distanceBetweenCurrentAndLastRow != directionMultiplier) { break; }
+                }
+                else if (directions[j] == WestDiagonal || directions[j] == EastDiagonal)
+                {
+                    if (distanceBetweenCurrentAndLastRow != directionMultiplier) { break; }
+                }
+                else if (directions[j] == NorthWestDiagonal || directions[j] == SouthEastDiagonal)
+                {
+                    if (distanceBetweenCurrentAndLastRow != 2 * directionMultiplier) { break; }
+                }
+                else if (directions[j] == NorthEastDiagonal || directions[j] == SouthWestDiagonal)
+                {
+                    if (distanceBetweenCurrentAndLastRow != directionMultiplier) { break; }
+                }
+
+                directionMultiplier++;
+            }
+
+            m_distanceToEndGrid[i][j] = --directionMultiplier;
+        }
+    }
+}
+
+void ChessEngine::distancesToEndGridFromHex(int hex) const
+{
+    int directions[12] = {
+        North, South, NorthEast, SouthEast, NorthWest, SouthWest,
+        EastDiagonal, WestDiagonal, NorthWestDiagonal, NorthEastDiagonal, SouthWestDiagonal, SouthEastDiagonal
+    };
+
+    for (int i = 0; i < 12; i++)
+    {
+        switch (directions[i])
+        {
+        case North:
+            std::cout << "North: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        case South:
+            std::cout << "South: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        case NorthWest:
+            std::cout << "NorthWest: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        case NorthEast:
+            std::cout << "NorthEast: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        case SouthWest:
+            std::cout << "SouthWest: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        case SouthEast:
+            std::cout << "SouthEast: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        case EastDiagonal:
+            std::cout << "East Diagonal: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        case WestDiagonal:
+            std::cout << "West Diagonal: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        case NorthWestDiagonal:
+            std::cout << "North West Diagonal: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        case SouthWestDiagonal:
+            std::cout << "South West Diagonal: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        case NorthEastDiagonal:
+            std::cout << "North East Diagonal: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        case SouthEastDiagonal:
+            std::cout << "South East Diagonal: " << m_distanceToEndGrid[hex][i] << '\n';
+            break;
+        default:
+            std::cerr << "UNEXPECTED DIRECTION" << std::endl;
+        }
+    }
 }

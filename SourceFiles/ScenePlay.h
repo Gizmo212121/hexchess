@@ -12,7 +12,7 @@ class ScenePlay : public Scene
 
 private:
     // DEBUG STUFF
-    bool profileUpdateFunction = true;
+    bool profileUpdateFunction = false;
 
     ChessEngine m_chessEngine;
 

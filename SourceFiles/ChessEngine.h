@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 #include <array>
+#include <cmath>
+#include <iostream>
 
 const int GRID_HEX_COUNT = 121;
 const int GRID_LENGTH = 11;
@@ -33,7 +35,7 @@ enum {
     NorthWestDiagonal = - 2 * GRID_LENGTH + 1,
     NorthEastDiagonal = - GRID_LENGTH + 2,
     SouthWestDiagonal = GRID_LENGTH - 2,
-    SouthEastDiagonal = 2 * GRID_LENGTH + 1
+    SouthEastDiagonal = 2 * GRID_LENGTH - 1
 };
 
 struct Move
@@ -48,6 +50,7 @@ class ChessEngine
 private:
 
     std::array<int, GRID_HEX_COUNT> m_grid;
+    int m_distanceToEndGrid[121][12];
 
     bool m_whiteToMove = true;
 
@@ -57,6 +60,7 @@ public:
 
     void init();
     void initializeGlinskiBoard();
+    void initializeDistanceToEndGrid();
 
     void movePiece(size_t startIndex, size_t targetIndex);
 
@@ -64,5 +68,6 @@ public:
     int getPiece(size_t index) const;
     bool whiteToMove() const { return m_whiteToMove ; }
     bool pieceColor(int piece) const; // White = true
+    void distancesToEndGridFromHex(int hex) const;
 
 };
