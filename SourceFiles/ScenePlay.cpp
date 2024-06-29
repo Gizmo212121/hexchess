@@ -29,7 +29,7 @@ void ScenePlay::initializeHexSpriteBoard()
 
     for (size_t i = 0; i < GRID_HEX_COUNT; i++)
     {
-        if (board[i] != Null)
+        if (board[i] != NONEXISTENT)
         {
             sf::Vector2f screenPos = axialToPixel(indexToAxial(i));
 
@@ -68,7 +68,7 @@ void ScenePlay::initializePieceSpriteBoard()
 
         int piece = board[i];
 
-        if (piece == Null || piece == None) 
+        if (piece == NONEXISTENT || piece == EMPTY) 
         { 
             pieceSprite.setPosition(screenPos.x, screenPos.y);
             continue ; 
@@ -87,22 +87,22 @@ void ScenePlay::initializePieceSpriteBoard()
 
             switch (pieceWithoutColor)
             {
-                case King:
+                case KING:
                     pieceString = "King";
                     break;
-                case Pawn:
+                case PAWN:
                     pieceString = "Pawn";
                     break;
-                case Knight:
+                case KNIGHT:
                     pieceString = "Knight";
                     break;
-                case Bishop:
+                case BISHOP:
                     pieceString = "Bishop";
                     break;
-                case Rook:
+                case ROOK:
                     pieceString = "Rook";
                     break;
-                case Queen:
+                case QUEEN:
                     pieceString = "Queen";
                     break;
                 default:
@@ -136,6 +136,14 @@ void ScenePlay::update()
     }
     else
     {
+        m_chessEngine.updatePieceMoves();
+
+        if (profileUpdateFunction)
+        {
+            sf::Time time = clock.getElapsedTime();
+            std::cout << "Profile: m_chessEngine.updatePieceMoves(): " << time.asSeconds() << std::endl;
+        }
+
         sMouseInput();
 
         if (profileUpdateFunction)
@@ -182,7 +190,7 @@ void ScenePlay::sRender()
     {
         for (size_t i = 0; i < GRID_HEX_COUNT; i++)
         {
-            if (board[i] != Null)
+            if (board[i] != NONEXISTENT)
             {
                 m_game->window().draw(m_hexSpriteBoard[i]);
             }
@@ -199,14 +207,53 @@ void ScenePlay::sRender()
         }
 
         // If we have a held piece, draw it last so it overlaps
-        if (m_selectedPieceSprite) { m_game->window().draw( m_pieceSpriteBoard[ m_selectedPieceIndex ] ) ; }
+        if (m_selectedPieceSprite)
+        { 
+            // Draw move spots
+            for (const Move& move : m_chessEngine.getMoves())
+            {
+                if (move.start == (int)m_selectedPieceIndex)
+                {
+                    if (m_chessEngine.getPiece(move.target))
+                    {
+                        sf::Vector2f screenPos = axialToPixel(indexToAxial(move.target));
+
+                        sf::CircleShape circle;
+
+                        circle.setRadius(25);
+                        circle.setOrigin(15, 15);
+                        circle.setFillColor(sf::Color(0, 0, 0, 0));
+                        circle.setOutlineColor(sf::Color::Blue);
+                        circle.setOutlineThickness(5);
+                        circle.setPosition(screenPos.x, screenPos.y);
+
+                        m_game->window().draw(circle);
+                    }
+                    else
+                    {
+                        sf::Vector2f screenPos = axialToPixel(indexToAxial(move.target));
+
+                        sf::CircleShape circle;
+
+                        circle.setRadius(15);
+                        circle.setOrigin(15, 15);
+                        circle.setFillColor(sf::Color::Blue);
+                        circle.setPosition(screenPos.x, screenPos.y);
+
+                        m_game->window().draw(circle);
+                    }
+                }
+            }
+
+            m_game->window().draw( m_pieceSpriteBoard[ m_selectedPieceIndex ] ) ; 
+        }
     }
 
     if (m_renderGridValues)
     {
         for (size_t i = 0; i < GRID_HEX_COUNT; i++)
         {
-            if (board[i] == Null) { continue ; }
+            if (board[i] == NONEXISTENT) { continue ; }
 
             sf::Vector2f axialPos = indexToAxial(i);
 
@@ -262,15 +309,17 @@ void ScenePlay::sMouseInput()
         {
             if (m_selectedPieceSprite)
             {
+                Move candidateMove(m_selectedPieceIndex, axialToIndex(mouseAxialPos));
+
                 if (m_currentlyDragging)
                 {
                     m_selectedPieceSprite->setPosition(absoluteMousePosition.x, absoluteMousePosition.y);
                 }
                 //else if (vectorHasObject(selectedPieceComponent.moveSet, mouseAxialPos) || vectorHasObject(selectedPieceComponent.takeSet, mouseAxialPos))
                 // TODO: NEED A WAY TO CHECK FOR VALID MOVES
-                else if (onBoard(mouseAxialPos) && mouseAxialPos != originalSelectedAxialPosition)
+                else if (onBoard(mouseAxialPos) && mouseAxialPos != originalSelectedAxialPosition && m_chessEngine.isMoveAvailable(candidateMove))
                 {
-                    movePiece(m_selectedPieceIndex, axialToIndex(mouseAxialPos));
+                    movePiece(candidateMove);
                     m_selectedPieceSprite = nullptr;
                 }
                 else if (pieceOnClickedHex)
@@ -321,13 +370,14 @@ void ScenePlay::sMouseInput()
         }
         else if (m_selectedPieceSprite && m_currentlyDragging)
         {
+            Move candidateMove(m_selectedPieceIndex, axialToIndex(mouseAxialPos));
             // Drop the piece if mouse on move/take hex
-            //if (vectorHasObject(selectedPieceComponent.takeSet, mouseAxialPos) || vectorHasObject(selectedPieceComponent.moveSet, mouseAxialPos))
-            if (onBoard(mouseAxialPos) && mouseAxialPos != originalSelectedAxialPosition)
+            if (onBoard(mouseAxialPos) && mouseAxialPos != originalSelectedAxialPosition && m_chessEngine.isMoveAvailable(candidateMove))
             {
                 m_selectedPieceSprite->setScale(pieceSpriteScale, pieceSpriteScale);
-                movePiece(m_selectedPieceIndex, axialToIndex(mouseAxialPos));
+                movePiece(candidateMove);
                 m_selectedPieceSprite = nullptr;
+                
             }
             else
             {
@@ -386,13 +436,13 @@ bool ScenePlay::onBoard(const sf::Vector2f& vec) const
     return ((fabs(vec.x) + fabs(vec.y) + fabs(- vec.x - vec.y)) / 2 <= 5);
 }
 
-void ScenePlay::movePiece(size_t startIndex, size_t targetIndex)
+void ScenePlay::movePiece(const Move& move)
 {
-    m_pieceSpriteBoard[targetIndex] = m_pieceSpriteBoard[startIndex];
-    m_pieceSpriteBoard[startIndex] = sf::Sprite();
+    m_pieceSpriteBoard[move.target] = m_pieceSpriteBoard[move.start];
+    m_pieceSpriteBoard[move.start] = sf::Sprite();
 
-    sf::Vector2f newPos = axialToPixel(indexToAxial(targetIndex));
-    m_pieceSpriteBoard[targetIndex].setPosition(newPos);
+    sf::Vector2f newPos = axialToPixel(indexToAxial(move.target));
+    m_pieceSpriteBoard[move.target].setPosition(newPos);
 
-    m_chessEngine.movePiece(startIndex, targetIndex);
+    m_chessEngine.movePiece(move);
 }

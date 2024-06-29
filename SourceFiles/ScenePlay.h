@@ -52,7 +52,7 @@ private:
     void onEnd() override;
 
 
-    void movePiece(size_t startIndex, size_t targetIndex);
+    void movePiece(const Move& move);
 
 
     sf::Vector2f axialToPixel(const sf::Vector2f& vec) const;
