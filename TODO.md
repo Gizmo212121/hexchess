@@ -1,21 +1,2 @@
 TODO LIST:
-- [ x ] Fix piece rendering offeset (pieces that are drawn to the screen appear to be off-center by a small amount)
-    -> solved: the image itself was offset because of shadows
-- [ x ] Remove player-held piece when they click on a spot that doesn't contain piece
-- [ x ] Player can pick up piece of both colors
-- [ x ] Other pieces can visually overlap the piece tha player is holding
-- [ x ] Pieces not being destroyed by the entity manager?
-- [ x ] En passant
-- [ x ] Flesh out player-holding mechanism
-- [ x ] Refactor moveset-updating
-- [ x? ] Check & checkmate
-    - [ x ] Prevent own pieces from putting the king in check (pins)
-    - [ x ] Prevent the king from moving into a check
-    - [ x ] Only allow check-saving moves when in check (necessity to get out of check)
-    - [ x ] Checkmate when no moves possible
-    - [ ] RIGOROUSLY CHECK AS MANY CASES AS POSSIBLE
-- [ ] Stalemate when certain boards are met (ex: two kings is always stalemate)
-- [ x? ] Pawn promotions
-    - [ ] Maybe add player choice for pawn-promotion
-- [ ] Menu & UI
-- [ ] Fix window-resizing problems
+- [ ] Debugger queue: Just send messages to some particular output stream and enable/disable it.

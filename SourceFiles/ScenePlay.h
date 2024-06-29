@@ -12,7 +12,14 @@ class ScenePlay : public Scene
 
 private:
     // DEBUG STUFF
-    bool profileUpdateFunction = false;
+    sf::Clock m_debugClock;
+    bool m_profileUpdateFunction = false;
+
+    bool m_renderTextures = true;
+    bool m_renderGridAxialPositions = false;
+    sf::Text m_gridAxialText;
+    bool m_renderGridIndices = false;
+    sf::Text m_gridIndexText;
 
 private:
 
@@ -32,12 +39,7 @@ private:
     bool m_currentlyClicking = false;
     bool m_currentlyDragging = false;
 
-    bool m_renderTextures = true;
-    bool m_renderGridValues = false;
-
     float m_hexTextureSize = 121.0 / 3;
-
-    sf::Text m_gridText;
 
 public:
 

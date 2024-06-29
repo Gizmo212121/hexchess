@@ -11,7 +11,7 @@ const int GRID_HEX_COUNT = 91;
 const int GRID_LENGTH = 11;
 
 const int TOTAL_PIECE_COUNT = 36;
-const std::string GLINSKI_BOARD = "1prnqb/2p2bk/3p1b1n/4p3b/5ppppp/11/PPPPP5/R3P4/N1B1P3/QB2P2/BKNRP1";
+const std::string GLINSKI_BOARD = "1prnqb/2p2bk/3p1b1n/4p3r/5ppppp/11/PPPPP5/R3P4/N1B1P3/QB2P2/BKNRP1";
 
 enum {
     NONEXISTENT = -2,
@@ -70,8 +70,13 @@ private:
     std::array<int, TOTAL_PIECE_COUNT> m_pieces;
 
     std::array<int, 12> m_directions;
-    std::vector<Move> m_moves;
+    std::array<int, 12> m_knightDirections;
+
     int m_distanceToEndGrid[121][12];
+    bool m_knightMoveExistenceInGrid[121][12];
+
+    std::vector<Move> m_moves;
+    std::vector<int> m_pins;
 
     bool m_whiteToMove = true;
     bool m_nextTurn = true;
@@ -82,22 +87,26 @@ private:
     void initializeBoard(const std::string& fen);
     void initializeDistanceToEndGrid();
     void initializeDirectionsArray();
+    void initializeKnightDirectionsArray();
+    void initializeKnightMoveExistenceArray();
 
-    void generatePawnMoves(int startPosition, int piece);
-    void generateKingMoves(int startPosition, int piece);
+    void generatePawnMoves(int startPosition);
+    void generateKingMoves(int startPosition);
     void generateSlidingMoves(int startPosition, int piece);
-    void generateKnightMoves(int startPosition, int piece);
+    void generateKnightMoves(int startPosition);
 
 public:
 
     ChessEngine();
 
     // Getters
-    const std::array<int, GRID_CELL_COUNT>& getBoard() const { return m_grid ; };
-    const std::array<int, TOTAL_PIECE_COUNT>& getPieces() const { return m_pieces ; };
-    const std::array<int, TOTAL_PIECE_COUNT>& getPiecePositions() const { return m_piecePositions ; };
+    const std::array<int, GRID_CELL_COUNT>& getBoard() const { return m_grid ; }
+    int grid(int index) const { return m_grid[index] ; }
+    const std::array<int, TOTAL_PIECE_COUNT>& getPieces() const { return m_pieces ; }
+    int getPiece(int index) const { return m_pieces[m_grid[index]] ; }
+    const std::array<int, TOTAL_PIECE_COUNT>& getPiecePositions() const { return m_piecePositions ; }
+    int getPiecePosition(int index) const { return m_piecePositions[index] ; }
     const std::vector<Move>& getMoves() const { return m_moves ; }
-    int getPiece(size_t index) const { return m_grid[index] ; }
     void distancesToEndGridFromHex(int hex) const;
     bool whiteToMove() const { return m_whiteToMove ; }
     bool pieceColor(int piece) const { return (piece >> 3 & 1) ; } // WHITE = TRUE

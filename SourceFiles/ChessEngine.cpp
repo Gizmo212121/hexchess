@@ -11,14 +11,10 @@ ChessEngine::ChessEngine()
 void ChessEngine::init()
 {
     initializeBoard(GLINSKI_BOARD);
-    std::cout << "After initializeBoard function call\n";
-    for (int i = 0; i < TOTAL_PIECE_COUNT; i++)
-    {
-        std::cout << m_piecePositions[i] << '\n';
-    }
     initializeDirectionsArray();
     initializeDistanceToEndGrid();
-
+    initializeKnightDirectionsArray();
+    initializeKnightMoveExistenceArray();
 }
 
 void ChessEngine::initializeBoard(const std::string& fen)
@@ -28,10 +24,6 @@ void ChessEngine::initializeBoard(const std::string& fen)
     int nonExistentOffset = 5 - row;
 
     int piecesIndex = 0;
-
-    std::fill(m_piecePositions.begin(), m_piecePositions.end(), EMPTY);
-    std::fill(m_pieces.begin(), m_pieces.end(), EMPTY);
-    std::fill(m_grid.begin(), m_grid.end(), NONEXISTENT);
 
     for (int i = 0; i < static_cast<int>(fen.length()) ; i++)
     {
@@ -52,7 +44,7 @@ void ChessEngine::initializeBoard(const std::string& fen)
         }
         else if (column == 0)
         {
-            std::fill_n(m_grid.begin() + GRID_LENGTH * (row + 1) + column + nonExistentOffset, GRID_LENGTH, NONEXISTENT);
+            std::fill_n(m_grid.begin() + GRID_LENGTH * (row + 1) + nonExistentOffset, abs(nonExistentOffset), NONEXISTENT);
         }
 
         if (isdigit(char1))
@@ -100,29 +92,21 @@ void ChessEngine::initializeBoard(const std::string& fen)
                 exit(1);
             }
 
+            if (pieceToPlace < 0) { exit(1) ; }
+
             m_pieces[piecesIndex] = pieceToPlace;
             m_piecePositions[piecesIndex] = gridIndexOfPlacedPiece;
             m_grid[gridIndexOfPlacedPiece] = piecesIndex;
-
-            std::cout << "piece pos inside loop: " << m_piecePositions[piecesIndex] << '\n';
-            std::cout << "m_grid inside loop: " << m_grid[gridIndexOfPlacedPiece] << '\n';
-            std::cout << "piece inside loop: " << m_pieces[piecesIndex] << '\n';
 
             piecesIndex++;
             column++;
         }
     }
-
-    std::cout << "Exiting initializeBoard function\n";
-    for (int i = 0; i < TOTAL_PIECE_COUNT; i++)
-    {
-        std::cout << "piece pos inside function: " << m_piecePositions[i] << '\n';
-    }
 }
 
 void ChessEngine::initializeDistanceToEndGrid()
 {
-    for (int i = 0; i < GRID_HEX_COUNT; i++)
+    for (int i = 0; i < GRID_CELL_COUNT; i++)
     {
         if (m_grid[i] == NONEXISTENT) { continue ; }
 
@@ -130,11 +114,11 @@ void ChessEngine::initializeDistanceToEndGrid()
 
         for (int j = 0; j < 12; j++)
         {
-            if (i + m_directions[j] < 0 || i + m_directions[j] >= GRID_HEX_COUNT) { m_distanceToEndGrid[i][j] = 0 ; continue ; }
+            if (i + m_directions[j] < 0 || i + m_directions[j] >= GRID_CELL_COUNT) { m_distanceToEndGrid[i][j] = 0 ; continue ; }
 
             int directionMultiplier = 1;
 
-            while (i + m_directions[j] * directionMultiplier >= 0 && i + m_directions[j] * directionMultiplier < GRID_HEX_COUNT)
+            while (i + m_directions[j] * directionMultiplier >= 0 && i + m_directions[j] * directionMultiplier < GRID_CELL_COUNT)
             {
                 if (m_grid[i + m_directions[j] * directionMultiplier] == NONEXISTENT) { break; }
 
@@ -170,6 +154,43 @@ void ChessEngine::initializeDistanceToEndGrid()
     }
 }
 
+void ChessEngine::initializeKnightMoveExistenceArray()
+{
+    for (int i = 0; i < GRID_CELL_COUNT; i++)
+    {
+        int initialRow = i / GRID_LENGTH;
+
+        if (m_grid[i] == NONEXISTENT) 
+        { 
+            for (int j = 0; j < 12; j++) { m_knightMoveExistenceInGrid[i][j] = false; }
+            continue ; 
+        }
+
+        for (int knightDirectionIndex = 0; knightDirectionIndex < 12; knightDirectionIndex++)
+        {
+            int index = i + m_knightDirections[knightDirectionIndex];
+            int targetRow = index / GRID_LENGTH;
+            int rowDistance = abs(initialRow - targetRow);
+
+            if (knightDirectionIndex == 0 || knightDirectionIndex == 2 || knightDirectionIndex == 5 || knightDirectionIndex == 7)
+            {
+                if (rowDistance != 2) { m_knightMoveExistenceInGrid[i][knightDirectionIndex] = false; continue; }
+            }
+            else if (knightDirectionIndex == 1 || knightDirectionIndex == 3 || knightDirectionIndex == 4 || knightDirectionIndex == 6)
+            {
+                if (rowDistance != 1) { m_knightMoveExistenceInGrid[i][knightDirectionIndex] = false; continue; }
+            }
+            else if (knightDirectionIndex == 8 || knightDirectionIndex == 9 || knightDirectionIndex == 10 || knightDirectionIndex == 11)
+            {
+                if (rowDistance != 3) { m_knightMoveExistenceInGrid[i][knightDirectionIndex] = false; continue; }
+            }
+
+            bool onGrid = !(index < 0 || index >= GRID_CELL_COUNT);
+            m_knightMoveExistenceInGrid[i][knightDirectionIndex] = onGrid;
+        }
+    }
+}
+
 void ChessEngine::initializeDirectionsArray()
 {
     m_directions[0] = NORTH;
@@ -185,6 +206,22 @@ void ChessEngine::initializeDirectionsArray()
     m_directions[9] = NORTH_EAST_DIAGONAL;
     m_directions[10] = SOUTH_WEST_DIAGONAL;
     m_directions[11] = SOUTH_EAST_DIAGONAL;
+}
+
+void ChessEngine::initializeKnightDirectionsArray()
+{
+    m_knightDirections[0] = 2 * GRID_LENGTH - 3;
+    m_knightDirections[1] = GRID_LENGTH - 3;
+    m_knightDirections[2] = - m_knightDirections[0];
+    m_knightDirections[3] = - m_knightDirections[1];
+    m_knightDirections[4] = GRID_LENGTH + 2;
+    m_knightDirections[5] = 2 * GRID_LENGTH + 1;
+    m_knightDirections[6] = - m_knightDirections[4];
+    m_knightDirections[7] = - m_knightDirections[5];
+    m_knightDirections[8] = 3 * GRID_LENGTH - 1;
+    m_knightDirections[9] = 3 * GRID_LENGTH - 2;
+    m_knightDirections[10] = - m_knightDirections[8];
+    m_knightDirections[11] = - m_knightDirections[9];
 }
 
 void ChessEngine::movePiece(const Move& move)
@@ -282,13 +319,13 @@ void ChessEngine::updatePieceMoves()
             switch (piece)
             {
             case PAWN:
-                generatePawnMoves(startPosition, piece);
+                generatePawnMoves(startPosition);
                 break;
             case KING:
-                generateKingMoves(startPosition, piece);
+                generateKingMoves(startPosition);
                 break;
             case KNIGHT:
-                generateKnightMoves(startPosition, piece);
+                generateKnightMoves(startPosition);
                 break;
             default:
                 generateSlidingMoves(startPosition, piece);
@@ -349,6 +386,38 @@ void ChessEngine::generateSlidingMoves(int startPosition, int piece)
     }
 }
 
-void ChessEngine::generatePawnMoves(int startPosition, int piece) {}
-void ChessEngine::generateKingMoves(int startPosition, int piece) {}
-void ChessEngine::generateKnightMoves(int startPosition, int piece) {}
+void ChessEngine::generateKnightMoves(int startPosition)
+{
+    for (int knightDirectionIndex = 0; knightDirectionIndex < 12; knightDirectionIndex++)
+    {
+        if (!m_knightMoveExistenceInGrid[startPosition][knightDirectionIndex]) { continue ; }
+
+        int indexInGrid = startPosition + m_knightDirections[knightDirectionIndex];
+
+        int indexInPieceArray = m_grid[indexInGrid];
+
+        if (indexInPieceArray != EMPTY)
+        {
+            int pieceAtHex = m_pieces[indexInPieceArray];
+
+            if (pieceColor(pieceAtHex) == !m_whiteToMove)
+            {
+                m_moves.push_back(Move(startPosition, indexInGrid));
+            }
+        }
+        else
+        {
+            m_moves.push_back(Move(startPosition, indexInGrid));
+        }
+    }
+}
+
+void ChessEngine::generateKingMoves(int startPosition)
+{
+
+}
+
+void ChessEngine::generatePawnMoves(int startPosition)
+{
+
+}
