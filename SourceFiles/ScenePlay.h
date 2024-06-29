@@ -14,16 +14,21 @@ private:
     // DEBUG STUFF
     bool profileUpdateFunction = false;
 
+private:
+
     ChessEngine m_chessEngine;
 
-    std::array<sf::Sprite, GRID_HEX_COUNT> m_pieceSpriteBoard;
+    std::array<sf::Sprite, TOTAL_PIECE_COUNT> m_pieceSpriteBoard;
     float pieceSpriteScale = 1.0 / 14;
-    std::array<sf::Sprite, GRID_HEX_COUNT> m_hexSpriteBoard;
+    std::array<sf::Sprite, GRID_CELL_COUNT> m_hexSpriteBoard;
     float hexSpriteScale = 1.0 / 2.99;
+
+    std::array<sf::Vector2f, GRID_CELL_COUNT> m_indexToAxial;
+
     // PLAYER VARIABLES
     // Something to store a held piece, also:
     sf::Sprite* m_selectedPieceSprite = nullptr;
-    size_t m_selectedPieceIndex = 0;
+    int m_selectedPieceIndex = 0;
     bool m_currentlyClicking = false;
     bool m_currentlyDragging = false;
 
@@ -41,6 +46,7 @@ public:
 private:
 
     void init();
+    void initializeIndexToAxialArray();
     void initializeHexSpriteBoard();
     void initializePieceSpriteBoard();
 
@@ -57,7 +63,6 @@ private:
 
     sf::Vector2f axialToPixel(const sf::Vector2f& vec) const;
     sf::Vector2f pixelToAxial(const sf::Vector2f& vec) const;
-    sf::Vector2f indexToAxial(const size_t index) const;
     size_t axialToIndex(const sf::Vector2f& axial) const;
     bool onBoard(const sf::Vector2f& axialPos) const;
 

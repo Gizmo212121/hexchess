@@ -1,6 +1,7 @@
 #include "ScenePlay.h"
 #include "ChessEngine.h"
 #include "GameEngine.h"
+#include <SFML/System/Vector2.hpp>
 
 ScenePlay::ScenePlay(GameEngine* gameEngine)
     : Scene(gameEngine)
@@ -19,21 +20,36 @@ void ScenePlay::init()
     registerKeyboardAction(sf::Keyboard::G, "TOGGLE_GRID");
     registerMouseAction(sf::Mouse::Left, "MOUSE_LEFT");
 
+    initializeIndexToAxialArray();
     initializeHexSpriteBoard();
     initializePieceSpriteBoard();
 }
 
+void ScenePlay::initializeIndexToAxialArray()
+{
+    for (int index = 0; index < GRID_CELL_COUNT; index++)
+    {
+        int column = index % GRID_LENGTH;
+        int row = index / GRID_LENGTH;
+
+        int q = column + row + 1 - GRID_LENGTH;
+        int r = 5 - row;
+
+        m_indexToAxial[index] = sf::Vector2f(q, r);
+    }
+}
+
 void ScenePlay::initializeHexSpriteBoard()
 {
-    std::array<int, GRID_HEX_COUNT> board = m_chessEngine.getBoard();
+    std::array<int, GRID_CELL_COUNT> board = m_chessEngine.getBoard();
 
-    for (size_t i = 0; i < GRID_HEX_COUNT; i++)
+    for (size_t i = 0; i < GRID_CELL_COUNT; i++)
     {
         if (board[i] != NONEXISTENT)
         {
-            sf::Vector2f screenPos = axialToPixel(indexToAxial(i));
+            sf::Vector2f screenPos = axialToPixel(m_indexToAxial[i]);
 
-            sf::Vector2f axialPos = indexToAxial(i);
+            sf::Vector2f axialPos = m_indexToAxial[i];
             int colorCode = static_cast<int>(axialPos.x) - static_cast<int>(axialPos.y);
             std::string hexAssetName;
 
@@ -58,70 +74,55 @@ void ScenePlay::initializeHexSpriteBoard()
 
 void ScenePlay::initializePieceSpriteBoard()
 {
-    std::array<int, GRID_HEX_COUNT> board = m_chessEngine.getBoard();
+    std::array<int, TOTAL_PIECE_COUNT> pieceArray = m_chessEngine.getPieces();
+    std::array<int, TOTAL_PIECE_COUNT> pieceIndexArray = m_chessEngine.getPiecePositions();
 
-    for (size_t i = 0; i < GRID_HEX_COUNT; i++)
+    for (int i = 0; i < TOTAL_PIECE_COUNT; i++)
     {
         sf::Sprite pieceSprite;
+        sf::Vector2f screenPos = axialToPixel(m_indexToAxial[pieceIndexArray[i]]);
 
-        sf::Vector2f screenPos = axialToPixel(indexToAxial(i));
+        int piece = pieceArray[i];
 
-        int piece = board[i];
+        bool isWhite = m_chessEngine.pieceColor(piece);
+        int pieceWithoutColor = piece ^ ((isWhite) ? WHITE : BLACK);
 
-        if (piece == NONEXISTENT || piece == EMPTY) 
-        { 
-            pieceSprite.setPosition(screenPos.x, screenPos.y);
-            continue ; 
-        }
-        else
+        std::string colorString = (isWhite) ? "w" : "b" ;
+        std::string pieceString;
+
+        switch (pieceWithoutColor)
         {
-            bool isWhite = m_chessEngine.pieceColor(piece);
-            int pieceWithoutColor;
-
-            // Gives us the enum for the piece without the color bits
-            int colorExtractBool = (isWhite) ? 0b1000 : 0b10000 ;
-            pieceWithoutColor = piece ^ colorExtractBool;
-
-            std::string colorString = (isWhite) ? "w" : "b" ;
-            std::string pieceString;
-
-            switch (pieceWithoutColor)
-            {
-                case KING:
-                    pieceString = "King";
-                    break;
-                case PAWN:
-                    pieceString = "Pawn";
-                    break;
-                case KNIGHT:
-                    pieceString = "Knight";
-                    break;
-                case BISHOP:
-                    pieceString = "Bishop";
-                    break;
-                case ROOK:
-                    pieceString = "Rook";
-                    break;
-                case QUEEN:
-                    pieceString = "Queen";
-                    break;
-                default:
-                    std::cerr << "Unexpected value in piece init switch statement: " << pieceWithoutColor << std::endl;
-                    exit(1);
-            }
-
-            pieceSprite.setTexture(m_game->assets().getTexture(colorString + pieceString));
-
-
-            sf::FloatRect localBounds = pieceSprite.getLocalBounds();
-            pieceSprite.setOrigin(localBounds.width / 2, localBounds.height / 2);
-
-            pieceSprite.setPosition(screenPos.x, screenPos.y);
-
-            pieceSprite.setScale(pieceSpriteScale, pieceSpriteScale);
-
-            m_pieceSpriteBoard[i] = pieceSprite;
+            case KING:
+                pieceString = "King";
+                break;
+            case PAWN:
+                pieceString = "Pawn";
+                break;
+            case KNIGHT:
+                pieceString = "Knight";
+                break;
+            case BISHOP:
+                pieceString = "Bishop";
+                break;
+            case ROOK:
+                pieceString = "Rook";
+                break;
+            case QUEEN:
+                pieceString = "Queen";
+                break;
+            default:
+                std::cerr << "Unexpected value in piece init switch statement: " << pieceWithoutColor << std::endl;
+                exit(1);
         }
+
+        pieceSprite.setTexture(m_game->assets().getTexture(colorString + pieceString));
+
+        sf::FloatRect localBounds = pieceSprite.getLocalBounds();
+        pieceSprite.setOrigin(localBounds.width / 2, localBounds.height / 2);
+        pieceSprite.setPosition(screenPos.x, screenPos.y);
+        pieceSprite.setScale(pieceSpriteScale, pieceSpriteScale);
+
+        m_pieceSpriteBoard[i] = pieceSprite;
     }
 }
 
@@ -184,11 +185,11 @@ void ScenePlay::sRender()
     if (!m_paused) { m_game->window().clear(sf::Color(100, 100, 255)) ; }
     else { m_game->window().clear(sf::Color(50, 50, 150)) ; }
 
-    std::array<int, GRID_HEX_COUNT> board = m_chessEngine.getBoard();
+    std::array<int, GRID_CELL_COUNT> board = m_chessEngine.getBoard();
 
     if (m_renderTextures)
     {
-        for (size_t i = 0; i < GRID_HEX_COUNT; i++)
+        for (int i = 0; i < GRID_CELL_COUNT; i++)
         {
             if (board[i] != NONEXISTENT)
             {
@@ -196,9 +197,9 @@ void ScenePlay::sRender()
             }
         }
 
-        for (size_t i = 0; i < GRID_HEX_COUNT; i++)
+        for (int i = 0; i < TOTAL_PIECE_COUNT; i++)
         {
-            if (m_selectedPieceSprite && m_selectedPieceIndex == i) { continue ; }
+            if (m_selectedPieceSprite && board[m_selectedPieceIndex] == i) { continue ; }
 
             if (m_pieceSpriteBoard[i].getTexture())
             {
@@ -216,7 +217,7 @@ void ScenePlay::sRender()
                 {
                     if (m_chessEngine.getPiece(move.target))
                     {
-                        sf::Vector2f screenPos = axialToPixel(indexToAxial(move.target));
+                        sf::Vector2f screenPos = axialToPixel(m_indexToAxial[move.target]);
 
                         sf::CircleShape circle;
 
@@ -231,7 +232,7 @@ void ScenePlay::sRender()
                     }
                     else
                     {
-                        sf::Vector2f screenPos = axialToPixel(indexToAxial(move.target));
+                        sf::Vector2f screenPos = axialToPixel(m_indexToAxial[move.target]);
 
                         sf::CircleShape circle;
 
@@ -251,11 +252,11 @@ void ScenePlay::sRender()
 
     if (m_renderGridValues)
     {
-        for (size_t i = 0; i < GRID_HEX_COUNT; i++)
+        for (size_t i = 0; i < GRID_CELL_COUNT; i++)
         {
             if (board[i] == NONEXISTENT) { continue ; }
 
-            sf::Vector2f axialPos = indexToAxial(i);
+            sf::Vector2f axialPos = m_indexToAxial[i];
 
             std::string axialCoordinateText = '(' + std::to_string(static_cast<int>(axialPos.x)) + ", " + std::to_string(static_cast<int>(axialPos.y)) + ')';
 
@@ -282,7 +283,7 @@ void ScenePlay::sMouseInput()
 
     if (m_selectedPieceSprite)
     {
-        originalSelectedAxialPosition = indexToAxial(m_selectedPieceIndex);
+        originalSelectedAxialPosition = m_indexToAxial[m_selectedPieceIndex];
         m_currentlyDragging = m_selectedPieceSprite->getPosition() != axialToPixel(originalSelectedAxialPosition);
     }
 
@@ -377,7 +378,6 @@ void ScenePlay::sMouseInput()
                 m_selectedPieceSprite->setScale(pieceSpriteScale, pieceSpriteScale);
                 movePiece(candidateMove);
                 m_selectedPieceSprite = nullptr;
-                
             }
             else
             {
@@ -412,17 +412,6 @@ sf::Vector2f ScenePlay::pixelToAxial(const sf::Vector2f& vec) const
     return sf::Vector2f(round(x), round(y));
 }
 
-sf::Vector2f ScenePlay::indexToAxial(const size_t index) const
-{
-    int column = index % GRID_LENGTH;
-    int row = index / GRID_LENGTH;
-
-    int q = column + row + 1 - GRID_LENGTH;
-    int r = 5 - row;
-
-    return sf::Vector2f(q, r);
-}
-
 size_t ScenePlay::axialToIndex(const sf::Vector2f& axial) const
 {
     float row = 5 - axial.y;
@@ -441,7 +430,7 @@ void ScenePlay::movePiece(const Move& move)
     m_pieceSpriteBoard[move.target] = m_pieceSpriteBoard[move.start];
     m_pieceSpriteBoard[move.start] = sf::Sprite();
 
-    sf::Vector2f newPos = axialToPixel(indexToAxial(move.target));
+    sf::Vector2f newPos = axialToPixel(m_indexToAxial[move.target]);
     m_pieceSpriteBoard[move.target].setPosition(newPos);
 
     m_chessEngine.movePiece(move);

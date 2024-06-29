@@ -6,15 +6,16 @@
 #include <iostream>
 #include <vector>
 
-const int GRID_HEX_COUNT = 121;
+const int GRID_CELL_COUNT = 121;
+const int GRID_HEX_COUNT = 91;
 const int GRID_LENGTH = 11;
-const int TOTAL_PIECE_COUNT = 36;
 
+const int TOTAL_PIECE_COUNT = 36;
 const std::string GLINSKI_BOARD = "1prnqb/2p2bk/3p1b1n/4p3b/5ppppp/11/PPPPP5/R3P4/N1B1P3/QB2P2/BKNRP1";
 
 enum {
-    NONEXISTENT = -1,
-    EMPTY = 0,
+    NONEXISTENT = -2,
+    EMPTY = -1,
     KING = 1,
     PAWN = 2,
     KNIGHT = 3,
@@ -64,8 +65,10 @@ class ChessEngine
 
 private:
 
-    std::array<int, GRID_HEX_COUNT> m_grid;
+    std::array<int, GRID_CELL_COUNT> m_grid;
     std::array<int, TOTAL_PIECE_COUNT> m_piecePositions;
+    std::array<int, TOTAL_PIECE_COUNT> m_pieces;
+
     std::array<int, 12> m_directions;
     std::vector<Move> m_moves;
     int m_distanceToEndGrid[121][12];
@@ -76,30 +79,29 @@ private:
 private:
 
     void init();
-    void initializeGlinskiBoard();
-    void initializeDistanceToEndGrid();
-    void initializePiecePositionsArray();
-    void initializeDirectionsArray();
-
     void initializeBoard(const std::string& fen);
+    void initializeDistanceToEndGrid();
+    void initializeDirectionsArray();
 
     void generatePawnMoves(int startPosition, int piece);
     void generateKingMoves(int startPosition, int piece);
     void generateSlidingMoves(int startPosition, int piece);
     void generateKnightMoves(int startPosition, int piece);
 
-
 public:
 
     ChessEngine();
 
     // Getters
-    const std::array<int, GRID_HEX_COUNT>& getBoard() const { return m_grid ; };
+    const std::array<int, GRID_CELL_COUNT>& getBoard() const { return m_grid ; };
+    const std::array<int, TOTAL_PIECE_COUNT>& getPieces() const { return m_pieces ; };
+    const std::array<int, TOTAL_PIECE_COUNT>& getPiecePositions() const { return m_piecePositions ; };
     const std::vector<Move>& getMoves() const { return m_moves ; }
-    int getPiece(size_t index) const;
+    int getPiece(size_t index) const { return m_grid[index] ; }
     void distancesToEndGridFromHex(int hex) const;
     bool whiteToMove() const { return m_whiteToMove ; }
-    bool pieceColor(int piece) const; // White = true
+    bool pieceColor(int piece) const { return (piece >> 3 & 1) ; } // WHITE = TRUE
+
     bool isMoveAvailable(const Move& move) const;
 
     void movePiece(const Move& move);

@@ -11,21 +11,29 @@ ChessEngine::ChessEngine()
 void ChessEngine::init()
 {
     initializeBoard(GLINSKI_BOARD);
+    std::cout << "After initializeBoard function call\n";
+    for (int i = 0; i < TOTAL_PIECE_COUNT; i++)
+    {
+        std::cout << m_piecePositions[i] << '\n';
+    }
     initializeDirectionsArray();
     initializeDistanceToEndGrid();
-    initializePiecePositionsArray();
+
 }
 
 void ChessEngine::initializeBoard(const std::string& fen)
 {
     int row = 0;
     int column = 0;
-
-    int strLen = static_cast<int>(fen.length());
-
     int nonExistentOffset = 5 - row;
 
-    for (int i = 0; i < strLen ; i++)
+    int piecesIndex = 0;
+
+    std::fill(m_piecePositions.begin(), m_piecePositions.end(), EMPTY);
+    std::fill(m_pieces.begin(), m_pieces.end(), EMPTY);
+    std::fill(m_grid.begin(), m_grid.end(), NONEXISTENT);
+
+    for (int i = 0; i < static_cast<int>(fen.length()) ; i++)
     {
         char char1 = fen[i];
 
@@ -39,38 +47,21 @@ void ChessEngine::initializeBoard(const std::string& fen)
 
         if (nonExistentOffset >= 0 && column == 0)
         {
-            for (int j = 0; j < nonExistentOffset; j++)
-            {
-                m_grid[row * GRID_LENGTH + column + j] = NONEXISTENT;
-            }
-
+            std::fill_n(m_grid.begin() + row * GRID_LENGTH + column, nonExistentOffset, NONEXISTENT);
             column += nonExistentOffset;
         }
         else if (column == 0)
         {
-            for (int j = nonExistentOffset + GRID_LENGTH; j < GRID_LENGTH; j++)
-            {
-                m_grid[row * GRID_LENGTH + column + j] = NONEXISTENT;
-            }
+            std::fill_n(m_grid.begin() + GRID_LENGTH * (row + 1) + column + nonExistentOffset, GRID_LENGTH, NONEXISTENT);
         }
 
         if (isdigit(char1))
         {
-            char char2 = fen[i + 1];
+            int offset = char1 - '0';
 
-            int offset = 0;
-
-            int char1int = char1 - '0';
-
-            if (isdigit(char2))
+            if (i + 1 < static_cast<int>(fen.length()) && isdigit(fen[i + 1]))
             {
-                int char2int = char2 - '0';
-                offset += (char1int) * 10 + char2int;
-                i++; // DONT WANT TO CONSIDER SAME NUMBER TWICE
-            }
-            else
-            {
-                offset = char1int;
+                offset = offset * 10 + (fen[++i] - '0');
             }
 
             if (offset > GRID_LENGTH || offset + column > GRID_LENGTH)
@@ -79,71 +70,54 @@ void ChessEngine::initializeBoard(const std::string& fen)
                 exit(1);
             }
 
-            for (int j = 0; j < offset; j++)
-            {
-                m_grid[row * GRID_LENGTH + column + j] = EMPTY;
-            }
+            std::fill_n(m_grid.begin() + row * GRID_LENGTH + column, offset, EMPTY);
 
             column += offset;
         }
         else
         {
-            bool isUppercase = std::isupper(char1);
-            char piece = std::tolower(char1);
-
             int pieceToPlace;
 
-            switch (piece)
+            switch (std::tolower(char1))
             {
-                case 'p':
-                    pieceToPlace = PAWN;
-                    break;
-                case 'n':
-                    pieceToPlace = KNIGHT;
-                    break;
-                case 'b':
-                    pieceToPlace = BISHOP;
-                    break;
-                case 'r':
-                    pieceToPlace = ROOK;
-                    break;
-                case 'q':
-                    pieceToPlace = QUEEN;
-                    break;
-                case 'k':
-                    pieceToPlace = KING;
-                    break;
+                case 'p': pieceToPlace = PAWN; break;
+                case 'n': pieceToPlace = KNIGHT; break;
+                case 'b': pieceToPlace = BISHOP; break;
+                case 'r': pieceToPlace = ROOK; break;
+                case 'q': pieceToPlace = QUEEN; break;
+                case 'k': pieceToPlace = KING; break;
                 default:
-                    std::cerr << "Unkown character in FEN string: " << piece << '\n';
+                    std::cerr << "Unkown character in FEN string: " << std::tolower(char1) << '\n';
                     exit(1);
             }
 
-            pieceToPlace |= (isUppercase) ? WHITE : BLACK;
+            pieceToPlace |= (std::isupper(char1)) ? WHITE : BLACK;
+            int gridIndexOfPlacedPiece = row * GRID_LENGTH + column;
 
-            m_grid[row * GRID_LENGTH + column] = pieceToPlace;
+            if (piecesIndex >= TOTAL_PIECE_COUNT)
+            {
+                std::cerr << "piecesIndex out of bounds: " << piecesIndex << '\n';
+                exit(1);
+            }
 
+            m_pieces[piecesIndex] = pieceToPlace;
+            m_piecePositions[piecesIndex] = gridIndexOfPlacedPiece;
+            m_grid[gridIndexOfPlacedPiece] = piecesIndex;
+
+            std::cout << "piece pos inside loop: " << m_piecePositions[piecesIndex] << '\n';
+            std::cout << "m_grid inside loop: " << m_grid[gridIndexOfPlacedPiece] << '\n';
+            std::cout << "piece inside loop: " << m_pieces[piecesIndex] << '\n';
+
+            piecesIndex++;
             column++;
         }
     }
-}
 
-void ChessEngine::initializeGlinskiBoard()
-{
-    m_grid = {
-
-        NONEXISTENT, NONEXISTENT, NONEXISTENT, NONEXISTENT, NONEXISTENT, EMPTY, BLACK | PAWN, BLACK | ROOK, BLACK | KNIGHT, BLACK | QUEEN, BLACK | BISHOP,
-        NONEXISTENT, NONEXISTENT, NONEXISTENT, NONEXISTENT, EMPTY, EMPTY, BLACK | PAWN, EMPTY, EMPTY, BLACK | BISHOP, BLACK | KING,
-        NONEXISTENT, NONEXISTENT, NONEXISTENT, EMPTY, EMPTY, EMPTY, BLACK | PAWN, EMPTY, BLACK | BISHOP, EMPTY, BLACK | KNIGHT,
-        NONEXISTENT, NONEXISTENT, EMPTY, EMPTY, EMPTY, EMPTY, BLACK | PAWN, EMPTY, EMPTY, EMPTY, BLACK | BISHOP,
-        NONEXISTENT, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, BLACK | PAWN, BLACK | PAWN, BLACK | PAWN, BLACK | PAWN, BLACK | PAWN,
-        EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
-        WHITE | PAWN, WHITE | PAWN, WHITE | PAWN, WHITE | PAWN, WHITE | PAWN, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, NONEXISTENT,
-        WHITE | ROOK, EMPTY, EMPTY, EMPTY, WHITE | PAWN, EMPTY, EMPTY, EMPTY, EMPTY, NONEXISTENT, NONEXISTENT,
-        WHITE | KNIGHT, EMPTY, WHITE | BISHOP, EMPTY, WHITE | PAWN, EMPTY, EMPTY, EMPTY, NONEXISTENT, NONEXISTENT, NONEXISTENT,
-        WHITE | QUEEN, WHITE | BISHOP, EMPTY, EMPTY, WHITE | PAWN, EMPTY, EMPTY, NONEXISTENT, NONEXISTENT, NONEXISTENT, NONEXISTENT,
-        WHITE | BISHOP, WHITE | KING, WHITE | KNIGHT, WHITE | ROOK, WHITE | PAWN, EMPTY, NONEXISTENT, NONEXISTENT, NONEXISTENT, NONEXISTENT, NONEXISTENT
-
-    };
+    std::cout << "Exiting initializeBoard function\n";
+    for (int i = 0; i < TOTAL_PIECE_COUNT; i++)
+    {
+        std::cout << "piece pos inside function: " << m_piecePositions[i] << '\n';
+    }
 }
 
 void ChessEngine::initializeDistanceToEndGrid()
@@ -196,19 +170,6 @@ void ChessEngine::initializeDistanceToEndGrid()
     }
 }
 
-void ChessEngine::initializePiecePositionsArray()
-{
-    int count = 0;
-
-    for (int i = 0; i < GRID_HEX_COUNT; i++)
-    {
-        if (m_grid[i] != NONEXISTENT && m_grid[i] != EMPTY)
-        {
-            m_piecePositions[count++] = i;
-        }
-    }
-}
-
 void ChessEngine::initializeDirectionsArray()
 {
     m_directions[0] = NORTH;
@@ -226,27 +187,15 @@ void ChessEngine::initializeDirectionsArray()
     m_directions[11] = SOUTH_EAST_DIAGONAL;
 }
 
-int ChessEngine::getPiece(size_t index) const
-{
-    return m_grid[index];
-}
-
-bool ChessEngine::pieceColor(int piece) const
-{
-    return (piece >> 3 & 1);
-}
-
 void ChessEngine::movePiece(const Move& move)
 {
-    // Move piece in the array of piece positions
-    auto it = std::find(m_piecePositions.begin(), m_piecePositions.end(), move.start);
-    m_piecePositions[it[0]] = move.target;
-    std::cout << "Changed m_piecePositions: Index: " << it[0] << " Position: " << move.target << std::endl;
+    if (m_grid[move.target] != -1) { m_piecePositions[m_grid[move.target]] = -1 ; }
 
+    m_piecePositions[m_grid[move.start]] = move.target;
 
-    // Move the piece in the main grid
     m_grid[move.target] = m_grid[move.start];
-    m_grid[move.start] = EMPTY;
+    m_grid[move.start] = -1;
+
 
     m_whiteToMove = !m_whiteToMove;
     m_nextTurn = true;
@@ -320,13 +269,15 @@ void ChessEngine::updatePieceMoves()
     if (m_nextTurn) { m_nextTurn = false ; }
     else { return ; }
 
+    m_moves.clear();
+
     for (int startPosition : m_piecePositions)
     {
-        int piece = m_grid[startPosition];
+        int piece = m_pieces[m_grid[startPosition]];
 
         if (pieceColor(piece) == m_whiteToMove)
         {
-            piece = piece ^ ((m_whiteToMove) ? 0b1000 : 0b10000);
+            piece = piece ^ ((m_whiteToMove) ? WHITE : BLACK);
 
             switch (piece)
             {
@@ -373,14 +324,16 @@ void ChessEngine::generateSlidingMoves(int startPosition, int piece)
 
         for (int distance = 1; distance <= m_distanceToEndGrid[startPosition][dirIndex]; distance++)
         {
-            int index = startPosition + direction * distance;
-            int pieceAtHex = m_grid[index];
+            int indexInGrid = startPosition + direction * distance;
+            int indexInPieceArray = m_grid[indexInGrid];
 
-            if (pieceAtHex != EMPTY)
+            if (indexInPieceArray != EMPTY)
             {
+                int pieceAtHex = m_pieces[indexInPieceArray];
+
                 if (pieceColor(pieceAtHex) == !m_whiteToMove)
                 {
-                    m_moves.push_back(Move(startPosition, index));
+                    m_moves.push_back(Move(startPosition, indexInGrid));
                     break;
                 }
                 else
@@ -390,7 +343,7 @@ void ChessEngine::generateSlidingMoves(int startPosition, int piece)
             }
             else
             {
-                m_moves.push_back(Move(startPosition, index));
+                m_moves.push_back(Move(startPosition, indexInGrid));
             }
         }
     }
