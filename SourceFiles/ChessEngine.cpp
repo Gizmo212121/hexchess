@@ -29,7 +29,7 @@ void ChessEngine::initializeBoard(const std::string& fen)
 
     int piecesIndex = 0;
 
-    std::fill_n(m_canDoubleMove, TOTAL_PIECE_COUNT, 0);
+    std::fill_n(m_canDoubleMove, TOTAL_PIECE_COUNT, false);
 
     for (int i = 0; i < static_cast<int>(fen.length()) ; i++)
     {
@@ -259,20 +259,45 @@ void ChessEngine::initializePinArray()
 
 void ChessEngine::movePiece(const Move& move)
 {
-    if (m_grid[move.target] != -1) { m_piecePositions[m_grid[move.target]] = -1 ; }
+    if (m_grid[move.target] != EMPTY) { m_piecePositions[m_grid[move.target]] = EMPTY ; }
 
     int movedPieceInitialPositionInPieceArray = m_grid[move.start];
 
     m_piecePositions[movedPieceInitialPositionInPieceArray] = move.target;
 
-    m_grid[move.target] = m_grid[move.start];
-    m_grid[move.start] = -1;
+    // En pessant gets reset every round
+    int prevEnPessantGridTakeIndex = m_enPessantGridTakeIndex;
+
+    m_enPessantGridTakeIndex = EMPTY;
+    m_enPessantGridMoveIndex = EMPTY;
 
     // If pawn moved, can't double move anymore
     if (m_piecesWithoutColor[movedPieceInitialPositionInPieceArray] == PAWN)
     {
         m_canDoubleMove[movedPieceInitialPositionInPieceArray] = false;
+
+        // If it double-moved
+        int displacement = move.target - move.start;
+
+        if (displacement == SOUTH * 2)
+        {
+            m_enPessantGridMoveIndex = move.start + SOUTH;
+            m_enPessantGridTakeIndex = move.target;
+        }
+        else if (displacement == NORTH * 2)
+        {
+            m_enPessantGridMoveIndex = move.start + NORTH;
+            m_enPessantGridTakeIndex = move.target;
+        }
+        else if (abs(displacement) != SOUTH && m_grid[move.target] == EMPTY)
+        {
+            m_piecePositions[m_grid[prevEnPessantGridTakeIndex]] = EMPTY;
+            m_grid[prevEnPessantGridTakeIndex] = EMPTY;
+        }
     }
+
+    m_grid[move.target] = m_grid[move.start];
+    m_grid[move.start] = EMPTY;
 
     m_whiteToMove = !m_whiteToMove;
     m_nextTurn = true;
@@ -348,10 +373,15 @@ void ChessEngine::updatePieceMoves()
     if (m_nextTurn) { m_nextTurn = false ; }
     else { return ; }
 
+    std::cout << "ENPESSANT GRID MOVE: " << m_enPessantGridMoveIndex << '\n';
+    std::cout << "ENPESSANT GRID TAKE: " << m_enPessantGridTakeIndex << '\n';
+
+    /*
     for (int pin : m_pins)
     {
         std::cout << "M_PINS: " << pin << '\n';
     }
+    */
 
     m_moves.clear();
 
@@ -403,6 +433,7 @@ void ChessEngine::generateSlidingMoves(int startPosition, int piece)
             break;
         default:
             std::cerr << "Unexpected piece number: " << piece << std::endl;
+            sf::sleep(sf::seconds(5));
             exit(1);
     }
 
@@ -511,10 +542,10 @@ void ChessEngine::generatePawnMoves(int startPosition, int piece)
 
     if (pin)
     {
-        std::cout << "PIN: " << pin << '\n';
-        std::cout << "m_directions[PAWN_MOVE]: " << m_directions[PAWN_MOVE] << '\n';
-        std::cout << "m_directions[PAWN_TAKES.first]: " << m_directions[PAWN_TAKES.first] << '\n';
-        std::cout << "m_directions[PAWN_TAKES.second - 1]: " << m_directions[PAWN_TAKES.second - 1] << '\n';
+        //std::cout << "PIN: " << pin << '\n';
+        //std::cout << "m_directions[PAWN_MOVE]: " << m_directions[PAWN_MOVE] << '\n';
+        //std::cout << "m_directions[PAWN_TAKES.first]: " << m_directions[PAWN_TAKES.first] << '\n';
+        //std::cout << "m_directions[PAWN_TAKES.second - 1]: " << m_directions[PAWN_TAKES.second - 1] << '\n';
         if (abs(pin) == abs(m_directions[PAWN_MOVE]))
         {
             int moveIndexInGrid = startPosition + m_directions[PAWN_MOVE];
@@ -524,7 +555,7 @@ void ChessEngine::generatePawnMoves(int startPosition, int piece)
             {
                 m_moves.push_back(Move(startPosition, moveIndexInGrid));
 
-                // IF ON STARTING MOVE, TEST DOUBLE MOVE
+                // IF ON STARTING MOVE, CAN DOUBLE MOVE
                 if (m_canDoubleMove[initialIndexInPieceArray])
                 {
                     int doubleMoveIndex = moveIndexInGrid + m_directions[PAWN_MOVE] * color;
@@ -598,6 +629,10 @@ void ChessEngine::generatePawnMoves(int startPosition, int piece)
             {
                 m_moves.push_back(Move(startPosition, takeIndexInGrid));
             }
+            else if (takeIndexInGrid == m_enPessantGridMoveIndex)
+            {
+                m_moves.push_back(Move(startPosition, takeIndexInGrid));
+            }
         }
     }
 }
@@ -624,17 +659,17 @@ void ChessEngine::generatePins()
 
             if (indexInPieceArrayOfFoundPiece != EMPTY)
             {
-                std::cout << "FOUND PIECE AT DISTANCE: " << distance << '\n';
+                //std::cout << "FOUND PIECE AT DISTANCE: " << distance << '\n';
                 int pieceAtHex = m_pieces[indexInPieceArrayOfFoundPiece];
                 bool pieceAtHexColor = pieceColor(pieceAtHex);
                 int pieceWithoutColor = pieceAtHex ^ ((pieceAtHexColor) ? WHITE : BLACK);
 
                 if (pieceAtHexColor == !m_whiteToMove && foundOwnedPiece)
                 {
-                    std::cout << "Already found piece and piece on hex is opposite color. Prev piece at:" << m_piecePositions[indexOfOwnedPiece] << '\n';
+                    //std::cout << "Already found piece and piece on hex is opposite color. Prev piece at:" << m_piecePositions[indexOfOwnedPiece] << '\n';
                     if (pieceWithoutColor == BISHOP && (dirIndex >= BISHOP_DIAGONAL_MOVES.first && dirIndex < BISHOP_DIAGONAL_MOVES.second))
                     {
-                        std::cout << "FOUND A BISHOP\n";
+                        //std::cout << "FOUND A BISHOP\n";
                         m_pins[indexOfOwnedPiece] = direction;
                     }
                     else if (pieceWithoutColor == ROOK && (dirIndex >= ALL_ADJACENT_MOVES.first && dirIndex < ALL_ADJACENT_MOVES.second))
@@ -643,7 +678,7 @@ void ChessEngine::generatePins()
                     }
                     else if (pieceWithoutColor == QUEEN)
                     {
-                        std::cout << "FOUND A QUEEN\n";
+                        //std::cout << "FOUND A QUEEN\n";
                         m_pins[indexOfOwnedPiece] = direction;
                     }
 
@@ -651,7 +686,7 @@ void ChessEngine::generatePins()
                 }
                 else if (!foundOwnedPiece)
                 {
-                    std::cout << "Found my own piece for first time\n";
+                    //std::cout << "Found my own piece for first time\n";
                     foundOwnedPiece = true;
                     indexOfOwnedPiece = indexInPieceArrayOfFoundPiece;
                 }

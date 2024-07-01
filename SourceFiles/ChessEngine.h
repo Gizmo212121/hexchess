@@ -78,7 +78,8 @@ private:
     std::array<int, TOTAL_PIECE_COUNT> m_piecesWithoutColor;
 
     bool m_canDoubleMove[TOTAL_PIECE_COUNT];
-    //bool m_enPessantPositions
+    int m_enPessantGridMoveIndex = -1;
+    int m_enPessantGridTakeIndex = -1;
 
     std::array<int, 12> m_directions;
     std::array<int, 12> m_knightDirections;
@@ -125,6 +126,8 @@ public:
     void distancesToEndGridFromHex(int hex) const;
     bool whiteToMove() const { return m_whiteToMove ; }
     bool pieceColor(int piece) const { return (piece >> 3 & 1) ; } // WHITE = TRUE
+
+    int enPessantGridMoveIndex() const { return m_enPessantGridMoveIndex ; }
 
     bool isMoveAvailable(const Move& move) const;
 

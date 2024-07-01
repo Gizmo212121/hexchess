@@ -227,7 +227,7 @@ void ScenePlay::sRender()
             {
                 if (move.start == m_selectedPieceIndex)
                 {
-                    if (m_chessEngine.grid(move.target) != EMPTY)
+                    if (m_chessEngine.grid(move.target) != EMPTY || move.target == m_chessEngine.enPessantGridMoveIndex())
                     {
                         sf::Vector2f screenPos = axialToPixel(m_indexToAxial[move.target]);
 
