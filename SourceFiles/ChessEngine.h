@@ -13,6 +13,9 @@ const int GRID_LENGTH = 11;
 const int TOTAL_PIECE_COUNT = 36;
 const std::string GLINSKI_BOARD = "1prnqb/2p2bk/3p1b1n/4p3r/5ppppp/11/PPPPP5/R3P4/N1B1P3/QB2P2/BKNRP1";
 
+//const int TOTAL_PIECE_COUNT = 4;
+//const std::string GLINSKI_BOARD = "4q1/6k/8/9/10/11/10/9/8/Q6/1K4";
+
 enum {
     NONEXISTENT = -2,
     EMPTY = -1,
@@ -28,6 +31,7 @@ enum {
 };
 
 enum {
+    NULL_DIRECTION = 0,
     NORTH_WEST = - GRID_LENGTH,
     SOUTH_WEST = -1,
     NORTH = - GRID_LENGTH + 1,
@@ -43,8 +47,8 @@ enum {
     SOUTH_EAST_DIAGONAL = 2 * GRID_LENGTH - 1
 };
 
-const int PAWN_TAKE = 0;
-const std::pair<int, int> PAWN_MOVES(1, 3);
+const int PAWN_MOVE = 0;
+const std::pair<int, int> PAWN_TAKES(1, 3);
 const std::pair<int, int> QUEEN_DIAGONAL_MOVES(6, 8);
 const std::pair<int, int> BISHOP_DIAGONAL_MOVES(8, 12);
 const std::pair<int, int> ALL_ADJACENT_MOVES(0, 6);
@@ -65,18 +69,28 @@ class ChessEngine
 
 private:
 
+    // Represents the main grid. Contains indices that points to m_piecePositions and m_pieces
     std::array<int, GRID_CELL_COUNT> m_grid;
+    // Contains indices for every piece. Said index points to m_grid
     std::array<int, TOTAL_PIECE_COUNT> m_piecePositions;
+    // Contains integers representing the pieces in a more meaningful way from m_piecePositions.
     std::array<int, TOTAL_PIECE_COUNT> m_pieces;
+    std::array<int, TOTAL_PIECE_COUNT> m_piecesWithoutColor;
+
+    bool m_canDoubleMove[TOTAL_PIECE_COUNT];
+    //bool m_enPessantPositions
 
     std::array<int, 12> m_directions;
     std::array<int, 12> m_knightDirections;
 
-    int m_distanceToEndGrid[121][12];
-    bool m_knightMoveExistenceInGrid[121][12];
+    int m_distanceToEndGrid[GRID_CELL_COUNT][12];
+    bool m_knightMoveExistenceInGrid[GRID_CELL_COUNT][12];
 
     std::vector<Move> m_moves;
-    std::vector<int> m_pins;
+    std::array<int, TOTAL_PIECE_COUNT> m_pins;
+    // King positions are stored as m_pieces indices, i.e between 0 and TOTAL_PIECE_COUNT
+    int m_whiteKingPosition;
+    int m_blackKingPosition;
 
     bool m_whiteToMove = true;
     bool m_nextTurn = true;
@@ -89,8 +103,9 @@ private:
     void initializeDirectionsArray();
     void initializeKnightDirectionsArray();
     void initializeKnightMoveExistenceArray();
+    void initializePinArray();
 
-    void generatePawnMoves(int startPosition);
+    void generatePawnMoves(int startPosition, int piece);
     void generateKingMoves(int startPosition);
     void generateSlidingMoves(int startPosition, int piece);
     void generateKnightMoves(int startPosition);
@@ -115,6 +130,7 @@ public:
 
     void movePiece(const Move& move);
 
+    void generatePins();
     void updatePieceMoves();
 
 };

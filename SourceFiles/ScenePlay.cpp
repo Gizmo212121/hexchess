@@ -138,12 +138,20 @@ void ScenePlay::update()
     }
     else
     {
+        m_chessEngine.generatePins();
+
+        if (m_profileUpdateFunction)
+        {
+            sf::Time time = m_debugClock.getElapsedTime();
+            std::cout << "Profile: m_chessEngine.generatePins(): " << time.asMicroseconds() << std::endl;
+        }
+
         m_chessEngine.updatePieceMoves();
 
         if (m_profileUpdateFunction)
         {
             sf::Time time = m_debugClock.getElapsedTime();
-            std::cout << "Profile: m_chessEngine.updatePieceMoves(): " << time.asSeconds() << std::endl;
+            std::cout << "Profile: m_chessEngine.updatePieceMoves(): " << time.asMicroseconds() << std::endl;
         }
 
         sMouseInput();
@@ -151,7 +159,7 @@ void ScenePlay::update()
         if (m_profileUpdateFunction)
         {
             sf::Time time = m_debugClock.getElapsedTime();
-            std::cout << "Profile: sMouseInput(): " << time.asSeconds() << std::endl;
+            std::cout << "Profile: sMouseInput(): " << time.asMicroseconds() << std::endl;
         }
 
         sRender();
@@ -159,7 +167,7 @@ void ScenePlay::update()
         if (m_profileUpdateFunction)
         {
             sf::Time time = m_debugClock.getElapsedTime();
-            std::cout << "Profile: sRender(): " << time.asSeconds() << std::endl;
+            std::cout << "Profile: sRender(): " << time.asMicroseconds() << std::endl;
 
             m_debugClock.restart();
         }
@@ -225,11 +233,11 @@ void ScenePlay::sRender()
 
                         sf::CircleShape circle;
 
-                        circle.setRadius(25);
-                        circle.setOrigin(25, 25);
+                        circle.setRadius(30);
+                        circle.setOrigin(30, 30);
                         circle.setFillColor(sf::Color(0, 0, 0, 0));
-                        circle.setOutlineColor(sf::Color::Blue);
-                        circle.setOutlineThickness(5);
+                        circle.setOutlineColor(sf::Color(145, 153, 227));
+                        circle.setOutlineThickness(4);
                         circle.setPosition(screenPos.x, screenPos.y);
 
                         m_game->window().draw(circle);
@@ -242,7 +250,7 @@ void ScenePlay::sRender()
 
                         circle.setRadius(15);
                         circle.setOrigin(15, 15);
-                        circle.setFillColor(sf::Color::Blue);
+                        circle.setFillColor(sf::Color(145, 153, 227));
                         circle.setPosition(screenPos.x, screenPos.y);
 
                         m_game->window().draw(circle);

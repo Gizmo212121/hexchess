@@ -15,6 +15,10 @@ void ChessEngine::init()
     initializeDistanceToEndGrid();
     initializeKnightDirectionsArray();
     initializeKnightMoveExistenceArray();
+    initializePinArray();
+
+    std::cout << "WKING POS: " << m_whiteKingPosition << std::endl;
+    std::cout << "BKING POS: " << m_blackKingPosition << std::endl;
 }
 
 void ChessEngine::initializeBoard(const std::string& fen)
@@ -24,6 +28,8 @@ void ChessEngine::initializeBoard(const std::string& fen)
     int nonExistentOffset = 5 - row;
 
     int piecesIndex = 0;
+
+    std::fill_n(m_canDoubleMove, TOTAL_PIECE_COUNT, 0);
 
     for (int i = 0; i < static_cast<int>(fen.length()) ; i++)
     {
@@ -68,22 +74,23 @@ void ChessEngine::initializeBoard(const std::string& fen)
         }
         else
         {
-            int pieceToPlace;
+            int pieceToPlaceWithoutColor;
+            bool pieceColor = (std::isupper(char1));
 
             switch (std::tolower(char1))
             {
-                case 'p': pieceToPlace = PAWN; break;
-                case 'n': pieceToPlace = KNIGHT; break;
-                case 'b': pieceToPlace = BISHOP; break;
-                case 'r': pieceToPlace = ROOK; break;
-                case 'q': pieceToPlace = QUEEN; break;
-                case 'k': pieceToPlace = KING; break;
+                case 'p': pieceToPlaceWithoutColor = PAWN; break;
+                case 'n': pieceToPlaceWithoutColor = KNIGHT; break;
+                case 'b': pieceToPlaceWithoutColor = BISHOP; break;
+                case 'r': pieceToPlaceWithoutColor = ROOK; break;
+                case 'q': pieceToPlaceWithoutColor = QUEEN; break;
+                case 'k': pieceToPlaceWithoutColor = KING; break;
                 default:
                     std::cerr << "Unkown character in FEN string: " << std::tolower(char1) << '\n';
                     exit(1);
             }
 
-            pieceToPlace |= (std::isupper(char1)) ? WHITE : BLACK;
+            int pieceToPlaceWithColor = pieceToPlaceWithoutColor | ((pieceColor) ? WHITE : BLACK);
             int gridIndexOfPlacedPiece = row * GRID_LENGTH + column;
 
             if (piecesIndex >= TOTAL_PIECE_COUNT)
@@ -92,9 +99,26 @@ void ChessEngine::initializeBoard(const std::string& fen)
                 exit(1);
             }
 
-            if (pieceToPlace < 0) { exit(1) ; }
+            if (pieceToPlaceWithColor == (WHITE | KING))
+            {
+                m_whiteKingPosition = piecesIndex;
+            }
+            else if (pieceToPlaceWithColor == (BLACK | KING))
+            {
+               m_blackKingPosition = piecesIndex;
+            }
 
-            m_pieces[piecesIndex] = pieceToPlace;
+            if (pieceToPlaceWithColor == (WHITE | PAWN) || pieceToPlaceWithColor == (BLACK | PAWN))
+            {
+                m_canDoubleMove[piecesIndex] = true;
+            }
+            else
+            {
+                m_canDoubleMove[piecesIndex] = false;
+            }
+
+            m_pieces[piecesIndex] = pieceToPlaceWithColor;
+            m_piecesWithoutColor[piecesIndex] = pieceToPlaceWithoutColor;
             m_piecePositions[piecesIndex] = gridIndexOfPlacedPiece;
             m_grid[gridIndexOfPlacedPiece] = piecesIndex;
 
@@ -169,9 +193,13 @@ void ChessEngine::initializeKnightMoveExistenceArray()
         for (int knightDirectionIndex = 0; knightDirectionIndex < 12; knightDirectionIndex++)
         {
             int index = i + m_knightDirections[knightDirectionIndex];
+
+            if (m_grid[index] == NONEXISTENT) { continue ; }
+
             int targetRow = index / GRID_LENGTH;
             int rowDistance = abs(initialRow - targetRow);
 
+            // Anti row-wrapping
             if (knightDirectionIndex == 0 || knightDirectionIndex == 2 || knightDirectionIndex == 5 || knightDirectionIndex == 7)
             {
                 if (rowDistance != 2) { m_knightMoveExistenceInGrid[i][knightDirectionIndex] = false; continue; }
@@ -224,15 +252,27 @@ void ChessEngine::initializeKnightDirectionsArray()
     m_knightDirections[11] = - m_knightDirections[9];
 }
 
+void ChessEngine::initializePinArray()
+{
+    std::fill_n(m_pins.begin(), TOTAL_PIECE_COUNT, NULL_DIRECTION);
+}
+
 void ChessEngine::movePiece(const Move& move)
 {
     if (m_grid[move.target] != -1) { m_piecePositions[m_grid[move.target]] = -1 ; }
 
-    m_piecePositions[m_grid[move.start]] = move.target;
+    int movedPieceInitialPositionInPieceArray = m_grid[move.start];
+
+    m_piecePositions[movedPieceInitialPositionInPieceArray] = move.target;
 
     m_grid[move.target] = m_grid[move.start];
     m_grid[move.start] = -1;
 
+    // If pawn moved, can't double move anymore
+    if (m_piecesWithoutColor[movedPieceInitialPositionInPieceArray] == PAWN)
+    {
+        m_canDoubleMove[movedPieceInitialPositionInPieceArray] = false;
+    }
 
     m_whiteToMove = !m_whiteToMove;
     m_nextTurn = true;
@@ -303,8 +343,15 @@ bool ChessEngine::isMoveAvailable(const Move& move) const
 
 void ChessEngine::updatePieceMoves()
 {
+    sf::Clock clock;
+
     if (m_nextTurn) { m_nextTurn = false ; }
     else { return ; }
+
+    for (int pin : m_pins)
+    {
+        std::cout << "M_PINS: " << pin << '\n';
+    }
 
     m_moves.clear();
 
@@ -314,12 +361,12 @@ void ChessEngine::updatePieceMoves()
 
         if (pieceColor(piece) == m_whiteToMove)
         {
-            piece = piece ^ ((m_whiteToMove) ? WHITE : BLACK);
+            int pieceWithoutColor = piece ^ ((m_whiteToMove) ? WHITE : BLACK);
 
-            switch (piece)
+            switch (pieceWithoutColor)
             {
             case PAWN:
-                generatePawnMoves(startPosition);
+                generatePawnMoves(startPosition, piece);
                 break;
             case KING:
                 generateKingMoves(startPosition);
@@ -328,11 +375,15 @@ void ChessEngine::updatePieceMoves()
                 generateKnightMoves(startPosition);
                 break;
             default:
-                generateSlidingMoves(startPosition, piece);
+                generateSlidingMoves(startPosition, pieceWithoutColor);
                 break;
             }
         }
     }
+
+    sf::Time time = clock.getElapsedTime();
+    std::cout << "CALCULATE MOVEs: " << time.asMicroseconds() << '\n';
+
 }
 
 void ChessEngine::generateSlidingMoves(int startPosition, int piece)
@@ -355,9 +406,16 @@ void ChessEngine::generateSlidingMoves(int startPosition, int piece)
             exit(1);
     }
 
+    int initialIndexInPieceArray = m_grid[startPosition];
+    int pin = m_pins[initialIndexInPieceArray];
+
     for (int dirIndex = directionIndex.first; dirIndex < directionIndex.second; dirIndex++)
     {
+        if (pin != NULL_DIRECTION) { std::cout << "PIN\n";}
+
         int direction = m_directions[dirIndex];
+
+        if (pin && direction != - pin && direction != pin) { continue ; }
 
         for (int distance = 1; distance <= m_distanceToEndGrid[startPosition][dirIndex]; distance++)
         {
@@ -384,10 +442,15 @@ void ChessEngine::generateSlidingMoves(int startPosition, int piece)
             }
         }
     }
+
+    if (pin) { m_pins[initialIndexInPieceArray] = NULL_DIRECTION ; }
 }
 
 void ChessEngine::generateKnightMoves(int startPosition)
 {
+    int knightPiecePosition = m_grid[startPosition];
+    if (m_pins[knightPiecePosition] != NULL_DIRECTION) { m_pins[knightPiecePosition] = NULL_DIRECTION; return; }
+
     for (int knightDirectionIndex = 0; knightDirectionIndex < 12; knightDirectionIndex++)
     {
         if (!m_knightMoveExistenceInGrid[startPosition][knightDirectionIndex]) { continue ; }
@@ -414,10 +477,192 @@ void ChessEngine::generateKnightMoves(int startPosition)
 
 void ChessEngine::generateKingMoves(int startPosition)
 {
+    for (int dirIndex = 0; dirIndex < 12; dirIndex++)
+    {
+        int distanceAvailable = m_distanceToEndGrid[startPosition][dirIndex];
+        if (distanceAvailable <= 0) { continue ; }
 
+        int direction = m_directions[dirIndex];
+
+        int indexInGrid = startPosition + direction;
+        int indexInPieceArray = m_grid[indexInGrid];
+
+        if (indexInPieceArray != EMPTY)
+        {
+            int pieceAtHex = m_pieces[indexInPieceArray];
+
+            if (pieceColor(pieceAtHex) == !m_whiteToMove)
+            {
+                m_moves.push_back(Move(startPosition, indexInGrid));
+            }
+        }
+        else
+        {
+            m_moves.push_back(Move(startPosition, indexInGrid));
+        }
+    }
 }
 
-void ChessEngine::generatePawnMoves(int startPosition)
+void ChessEngine::generatePawnMoves(int startPosition, int piece)
 {
+    int initialIndexInPieceArray = m_grid[startPosition];
+    int pin = m_pins[initialIndexInPieceArray];
+    int color = (pieceColor(piece)) ? 1 : -1 ;
 
+    if (pin)
+    {
+        std::cout << "PIN: " << pin << '\n';
+        std::cout << "m_directions[PAWN_MOVE]: " << m_directions[PAWN_MOVE] << '\n';
+        std::cout << "m_directions[PAWN_TAKES.first]: " << m_directions[PAWN_TAKES.first] << '\n';
+        std::cout << "m_directions[PAWN_TAKES.second - 1]: " << m_directions[PAWN_TAKES.second - 1] << '\n';
+        if (abs(pin) == abs(m_directions[PAWN_MOVE]))
+        {
+            int moveIndexInGrid = startPosition + m_directions[PAWN_MOVE];
+            int indexInPieceArrayOfFoundPiece = m_grid[moveIndexInGrid];
+
+            if (indexInPieceArrayOfFoundPiece == EMPTY)
+            {
+                m_moves.push_back(Move(startPosition, moveIndexInGrid));
+
+                // IF ON STARTING MOVE, TEST DOUBLE MOVE
+                if (m_canDoubleMove[initialIndexInPieceArray])
+                {
+                    int doubleMoveIndex = moveIndexInGrid + m_directions[PAWN_MOVE] * color;
+                    int doubleMovePieceArrayIndex = m_grid[doubleMoveIndex];
+
+                    if (doubleMovePieceArrayIndex == EMPTY)
+                    {
+                        m_moves.push_back(Move(startPosition, doubleMoveIndex));
+                    }
+                }
+            }
+        }
+        else if (abs(pin) == abs(m_directions[PAWN_TAKES.first]))
+        {
+            int takeDirection = m_directions[PAWN_TAKES.first];
+
+            int takeIndexInGrid = startPosition + takeDirection * color;
+            int indexInPieceArrayOfFoundPiece = m_grid[takeIndexInGrid];
+            bool colorOfPieceAtHex = pieceColor(m_pieces[indexInPieceArrayOfFoundPiece]);
+
+            if (indexInPieceArrayOfFoundPiece != EMPTY && colorOfPieceAtHex == !m_whiteToMove)
+            {
+                m_moves.push_back(Move(startPosition, takeIndexInGrid));
+            }
+        }
+        else if (abs(pin) == abs(m_directions[PAWN_TAKES.second - 1]))
+        {
+            int takeDirection = m_directions[PAWN_TAKES.second - 1];
+
+            int takeIndexInGrid = startPosition + takeDirection * color;
+            int indexInPieceArrayOfFoundPiece = m_grid[takeIndexInGrid];
+            bool colorOfPieceAtHex = pieceColor(m_pieces[indexInPieceArrayOfFoundPiece]);
+
+            if (indexInPieceArrayOfFoundPiece != EMPTY && colorOfPieceAtHex == !m_whiteToMove)
+            {
+                m_moves.push_back(Move(startPosition, takeIndexInGrid));
+            }
+        }
+
+        m_pins[initialIndexInPieceArray] = NULL_DIRECTION;
+    }
+    else
+    {
+        int moveIndexInGrid = startPosition + m_directions[PAWN_MOVE] * color;
+        int indexInPieceArrayOfFoundPiece = m_grid[moveIndexInGrid];
+
+        if (indexInPieceArrayOfFoundPiece == EMPTY)
+        {
+            m_moves.push_back(Move(startPosition, moveIndexInGrid));
+
+            // IF ON STARTING MOVE, TEST DOUBLE MOVE
+            if (m_canDoubleMove[initialIndexInPieceArray])
+            {
+                int doubleMoveIndex = moveIndexInGrid + m_directions[PAWN_MOVE] * color;
+                int doubleMovePieceArrayIndex = m_grid[doubleMoveIndex];
+
+                if (doubleMovePieceArrayIndex == EMPTY)
+                {
+                    m_moves.push_back(Move(startPosition, doubleMoveIndex));
+                }
+            }
+        }
+
+        for (int takeDirection = PAWN_TAKES.first; takeDirection < PAWN_TAKES.second; takeDirection++)
+        {
+            int takeIndexInGrid = startPosition + m_directions[takeDirection] * color;
+            indexInPieceArrayOfFoundPiece = m_grid[takeIndexInGrid];
+            bool colorOfPieceAtHex = pieceColor(m_pieces[indexInPieceArrayOfFoundPiece]);
+
+            if (indexInPieceArrayOfFoundPiece != EMPTY && colorOfPieceAtHex == !m_whiteToMove)
+            {
+                m_moves.push_back(Move(startPosition, takeIndexInGrid));
+            }
+        }
+    }
+}
+
+void ChessEngine::generatePins()
+{
+    sf::Clock clock;
+
+    if (!m_nextTurn) { return ; }
+
+    int kingPosition = (m_whiteToMove) ? m_piecePositions[m_whiteKingPosition] : m_piecePositions[m_blackKingPosition];
+
+    for (int dirIndex = 0; dirIndex < 12; dirIndex++)
+    {
+        int direction = m_directions[dirIndex];
+
+        bool foundOwnedPiece = false;
+        int indexOfOwnedPiece = -1;
+
+        for (int distance = 1; distance <= m_distanceToEndGrid[kingPosition][dirIndex]; distance++)
+        {
+            int indexInGrid = kingPosition + direction * distance;
+            int indexInPieceArrayOfFoundPiece = m_grid[indexInGrid];
+
+            if (indexInPieceArrayOfFoundPiece != EMPTY)
+            {
+                std::cout << "FOUND PIECE AT DISTANCE: " << distance << '\n';
+                int pieceAtHex = m_pieces[indexInPieceArrayOfFoundPiece];
+                bool pieceAtHexColor = pieceColor(pieceAtHex);
+                int pieceWithoutColor = pieceAtHex ^ ((pieceAtHexColor) ? WHITE : BLACK);
+
+                if (pieceAtHexColor == !m_whiteToMove && foundOwnedPiece)
+                {
+                    std::cout << "Already found piece and piece on hex is opposite color. Prev piece at:" << m_piecePositions[indexOfOwnedPiece] << '\n';
+                    if (pieceWithoutColor == BISHOP && (dirIndex >= BISHOP_DIAGONAL_MOVES.first && dirIndex < BISHOP_DIAGONAL_MOVES.second))
+                    {
+                        std::cout << "FOUND A BISHOP\n";
+                        m_pins[indexOfOwnedPiece] = direction;
+                    }
+                    else if (pieceWithoutColor == ROOK && (dirIndex >= ALL_ADJACENT_MOVES.first && dirIndex < ALL_ADJACENT_MOVES.second))
+                    {
+                        m_pins[indexOfOwnedPiece] = direction;
+                    }
+                    else if (pieceWithoutColor == QUEEN)
+                    {
+                        std::cout << "FOUND A QUEEN\n";
+                        m_pins[indexOfOwnedPiece] = direction;
+                    }
+
+                    break;
+                }
+                else if (!foundOwnedPiece)
+                {
+                    std::cout << "Found my own piece for first time\n";
+                    foundOwnedPiece = true;
+                    indexOfOwnedPiece = indexInPieceArrayOfFoundPiece;
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    sf::Time time = clock.getElapsedTime();
+    std::cout << "FINDING PINS: " << time.asMicroseconds() << '\n';
 }
