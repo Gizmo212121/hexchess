@@ -10,11 +10,14 @@ const int GRID_CELL_COUNT = 121;
 const int GRID_HEX_COUNT = 91;
 const int GRID_LENGTH = 11;
 
-const int TOTAL_PIECE_COUNT = 36;
-const std::string GLINSKI_BOARD = "1prnqb/2p2bk/3p1b1n/4p3r/5ppppp/11/PPPPP5/R3P4/N1B1P3/QB2P2/BKNRP1";
+//const int TOTAL_PIECE_COUNT = 36;
+//const std::string GLINSKI_BOARD = "1prnqb/2p2bk/3p1b1n/4p3r/5ppppp/11/PPPPP5/R3P4/N1B1P3/QB2P2/BKNRP1";
 
-//const int TOTAL_PIECE_COUNT = 4;
-//const std::string GLINSKI_BOARD = "4q1/6k/8/9/10/11/10/9/8/Q6/1K4";
+const int TOTAL_PIECE_COUNT = 4;
+const std::string GLINSKI_BOARD = "4q1/6k/8/9/10/11/10/9/8/Q6/1K4";
+
+//const int TOTAL_PIECE_COUNT = 8;
+//const std::string GLINSKI_BOARD = "QpRPq1/6k/8/9/10/11/10/9/8/Q6/1K4";
 
 enum {
     NONEXISTENT = -2,
@@ -50,7 +53,6 @@ enum {
 const int PAWN_MOVE = 0;
 const std::pair<int, int> PAWN_TAKES(1, 3);
 const std::pair<int, int> QUEEN_DIAGONAL_MOVES(6, 8);
-const std::pair<int, int> BISHOP_DIAGONAL_MOVES(8, 12);
 const std::pair<int, int> ALL_ADJACENT_MOVES(0, 6);
 const std::pair<int, int> ALL_DIAGONAL_MOVES(6, 12);
 const std::pair<int, int> ALL_MOVES(0, 12);
@@ -77,6 +79,9 @@ private:
     std::array<int, TOTAL_PIECE_COUNT> m_pieces;
     std::array<int, TOTAL_PIECE_COUNT> m_piecesWithoutColor;
 
+    int m_blackStartingIndex = 0;
+    int m_whiteStartingIndex;
+
     bool m_canDoubleMove[TOTAL_PIECE_COUNT];
     int m_enPessantGridMoveIndex = -1;
     int m_enPessantGridTakeIndex = -1;
@@ -90,8 +95,6 @@ private:
     std::vector<Move> m_moves;
     std::array<int, TOTAL_PIECE_COUNT> m_pins;
     // King positions are stored as m_pieces indices, i.e between 0 and TOTAL_PIECE_COUNT
-    int m_whiteKingPosition;
-    int m_blackKingPosition;
 
     bool m_whiteToMove = true;
     bool m_nextTurn = true;
@@ -100,6 +103,8 @@ private:
 
     void init();
     void initializeBoard(const std::string& fen);
+    void sortBoard();
+
     void initializeDistanceToEndGrid();
     void initializeDirectionsArray();
     void initializeKnightDirectionsArray();

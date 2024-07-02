@@ -11,14 +11,12 @@ ChessEngine::ChessEngine()
 void ChessEngine::init()
 {
     initializeBoard(GLINSKI_BOARD);
+    sortBoard();
     initializeDirectionsArray();
     initializeDistanceToEndGrid();
     initializeKnightDirectionsArray();
     initializeKnightMoveExistenceArray();
     initializePinArray();
-
-    std::cout << "WKING POS: " << m_whiteKingPosition << std::endl;
-    std::cout << "BKING POS: " << m_blackKingPosition << std::endl;
 }
 
 void ChessEngine::initializeBoard(const std::string& fen)
@@ -74,7 +72,7 @@ void ChessEngine::initializeBoard(const std::string& fen)
         }
         else
         {
-            int pieceToPlaceWithoutColor;
+            int pieceToPlaceWithoutColor = 0;
             bool pieceColor = (std::isupper(char1));
 
             switch (std::tolower(char1))
@@ -99,15 +97,6 @@ void ChessEngine::initializeBoard(const std::string& fen)
                 exit(1);
             }
 
-            if (pieceToPlaceWithColor == (WHITE | KING))
-            {
-                m_whiteKingPosition = piecesIndex;
-            }
-            else if (pieceToPlaceWithColor == (BLACK | KING))
-            {
-               m_blackKingPosition = piecesIndex;
-            }
-
             if (pieceToPlaceWithColor == (WHITE | PAWN) || pieceToPlaceWithColor == (BLACK | PAWN))
             {
                 m_canDoubleMove[piecesIndex] = true;
@@ -127,6 +116,126 @@ void ChessEngine::initializeBoard(const std::string& fen)
         }
     }
 }
+
+void ChessEngine::sortBoard()
+{
+    // Sort the board based on color
+    for (int i = 0; i < TOTAL_PIECE_COUNT; i++)
+    {
+        if (pieceColor(m_pieces[i])) // If piece is white
+        {
+            bool foundBlackPiece = false;
+
+            for (int j = i + 1; j < TOTAL_PIECE_COUNT; j++)
+            {
+                if (!pieceColor(m_pieces[j])) // If piece is black
+                {
+                    int tempPiece = m_pieces[i];
+                    m_pieces[i] = m_pieces[j];
+                    m_pieces[j] = tempPiece;
+
+                    int tempPieceWithoutColor = m_piecesWithoutColor[i];
+                    m_piecesWithoutColor[i] = m_piecesWithoutColor[j];
+                    m_piecesWithoutColor[j] = tempPieceWithoutColor;
+
+                    int tempGrid = m_grid[m_piecePositions[i]];
+                    m_grid[m_piecePositions[i]] = m_grid[m_piecePositions[j]];
+                    m_grid[m_piecePositions[j]] = tempGrid;
+
+                    int tempPiecePosition = m_piecePositions[i];
+                    m_piecePositions[i] = m_piecePositions[j];
+                    m_piecePositions[j] = tempPiecePosition;
+
+                    foundBlackPiece = true;
+
+                    break;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+
+            if (!foundBlackPiece)
+            {
+                m_whiteStartingIndex = i;
+
+                break; // No more black pieces to push to front
+            }
+        }
+    }
+
+    // Sort the board such that the black king is at 0
+    bool foundBlackKing = false;
+
+    for (int i = 0; i < m_whiteStartingIndex; i++)
+    {
+        if (m_pieces[i] == (BLACK | KING))
+        {
+            foundBlackKing = true;
+
+            int tempPiece = m_pieces[i];
+            m_pieces[i] = m_pieces[0];
+            m_pieces[0] = tempPiece;
+
+            int tempPieceWithoutColor = m_piecesWithoutColor[i];
+            m_piecesWithoutColor[i] = m_piecesWithoutColor[0];
+            m_piecesWithoutColor[0] = tempPieceWithoutColor;
+
+            int tempGrid = m_grid[m_piecePositions[i]];
+            m_grid[m_piecePositions[i]] = m_grid[m_piecePositions[0]];
+            m_grid[m_piecePositions[0]] = tempGrid;
+
+            int tempPiecePosition = m_piecePositions[i];
+            m_piecePositions[i] = m_piecePositions[0];
+            m_piecePositions[0] = tempPiecePosition;
+
+            break;
+        }
+    }
+
+    if (!foundBlackKing)
+    {
+        std::cerr << "NO BLACK KING FOUND!\n";
+        exit(-1);
+    }
+
+    // Sort the board such that the white king is at 0
+    bool foundWhiteKing = false;
+
+    for (int i = m_whiteStartingIndex; i < TOTAL_PIECE_COUNT; i++)
+    {
+        if (m_pieces[i] == (WHITE | KING))
+        {
+            foundWhiteKing = true;
+
+            int tempPiece = m_pieces[i];
+            m_pieces[i] = m_pieces[m_whiteStartingIndex];
+            m_pieces[m_whiteStartingIndex] = tempPiece;
+
+            int tempPieceWithoutColor = m_piecesWithoutColor[i];
+            m_piecesWithoutColor[i] = m_piecesWithoutColor[m_whiteStartingIndex];
+            m_piecesWithoutColor[m_whiteStartingIndex] = tempPieceWithoutColor;
+
+            int tempGrid = m_grid[m_piecePositions[i]];
+            m_grid[m_piecePositions[i]] = m_grid[m_piecePositions[m_whiteStartingIndex]];
+            m_grid[m_piecePositions[m_whiteStartingIndex]] = tempGrid;
+
+            int tempPiecePosition = m_piecePositions[i];
+            m_piecePositions[i] = m_piecePositions[m_whiteStartingIndex];
+            m_piecePositions[m_whiteStartingIndex] = tempPiecePosition;
+
+            break;
+        }
+    }
+
+    if (!foundWhiteKing)
+    {
+        std::cerr << "NO WHITE KING FOUND!\n";
+        exit(-1);
+    }
+}
+
 
 void ChessEngine::initializeDistanceToEndGrid()
 {
@@ -426,14 +535,13 @@ void ChessEngine::generateSlidingMoves(int startPosition, int piece)
             directionIndex = ALL_MOVES;
             break;
         case BISHOP:
-            directionIndex = BISHOP_DIAGONAL_MOVES;
+            directionIndex = ALL_DIAGONAL_MOVES;
             break;
         case ROOK:
             directionIndex = ALL_ADJACENT_MOVES;
             break;
         default:
             std::cerr << "Unexpected piece number: " << piece << std::endl;
-            sf::sleep(sf::seconds(5));
             exit(1);
     }
 
@@ -643,7 +751,8 @@ void ChessEngine::generatePins()
 
     if (!m_nextTurn) { return ; }
 
-    int kingPosition = (m_whiteToMove) ? m_piecePositions[m_whiteKingPosition] : m_piecePositions[m_blackKingPosition];
+    int kingPosition = (m_whiteToMove) ? m_piecePositions[m_whiteStartingIndex] : m_piecePositions[m_blackStartingIndex] ;
+    std::cout << "KING POS: " << kingPosition << '\n';
 
     for (int dirIndex = 0; dirIndex < 12; dirIndex++)
     {
@@ -667,7 +776,7 @@ void ChessEngine::generatePins()
                 if (pieceAtHexColor == !m_whiteToMove && foundOwnedPiece)
                 {
                     //std::cout << "Already found piece and piece on hex is opposite color. Prev piece at:" << m_piecePositions[indexOfOwnedPiece] << '\n';
-                    if (pieceWithoutColor == BISHOP && (dirIndex >= BISHOP_DIAGONAL_MOVES.first && dirIndex < BISHOP_DIAGONAL_MOVES.second))
+                    if (pieceWithoutColor == BISHOP && (dirIndex >= ALL_DIAGONAL_MOVES.first && dirIndex < ALL_DIAGONAL_MOVES.second))
                     {
                         //std::cout << "FOUND A BISHOP\n";
                         m_pins[indexOfOwnedPiece] = direction;
